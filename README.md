@@ -1,4 +1,4 @@
-# Shoreline Woodworking Website
+# Shoreline Woodworks Website
 
 ## Prerequisites
 1. Make sure you have [Docker Desktop](https://docs.docker.com/get-started/introduction/get-docker-desktop/) installed (if you haven't installed it already).
@@ -53,7 +53,7 @@ docker exec -it shoreline_postgres psql -U postgres -d shoreline_dev
 11. Generate a 32-byte random secret encoded in base64:
 - Windows
   ```powershell
-  [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+  $b = New-Object byte[] 32; $rng=[System.Security.Cryptography.RandomNumberGenerator]::Create(); $rng.GetBytes($b); $rng.Dispose(); [Convert]::ToBase64String($b)
   ```
 
 - MacOS/Linux:
@@ -81,6 +81,8 @@ docker exec -it shoreline_postgres psql -U postgres -d shoreline_dev
 
 After you make your commit and publish your branch, and make your PR, and once it's merged into upstream main, you will need to make sure that you update your origin and local repo:
 
+#### One way of updating local and origin main:
+
 ```shell
 git fetch upstream
 ```
@@ -104,7 +106,18 @@ git push origin main
 - Pushes your updated local main to your fork on GitHub (origin/main).
 - Now your fork’s main is fully in sync with upstream.
 
+#### The Full Stack course way of updating local and origin main:
+
+```shell
+git switch main
+git pull upstream main
+git push origin main
+```
+
 Do each of these commands after every PR merge.
+
+**Be sure to create your new branch before you start work again.**
+I strongly recommend deleting your old branch.
 
 If you ever want to make sure that you're pushing to origin and not upstream, check with this:
 ```shell
