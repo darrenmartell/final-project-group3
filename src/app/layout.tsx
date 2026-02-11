@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DynamicFavicon from "@/components/DynamicFavicon";
 import { ThemeProvider } from "next-themes";
+import Providers from "@/components/Providers";
 
 const sans = Source_Sans_3({
   subsets: ["latin"],
@@ -71,12 +72,14 @@ export default function RootLayout({
         <link rel="icon" href="/favicon-light.ico" sizes="any" />
       </head>
       <body className={`${sans.variable} ${serif.variable} flex min-h-screen flex-col`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <DynamicFavicon />
-          <Navbar />
-          <main className="grow">{children}</main>
-          <Footer />
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <DynamicFavicon />
+            <Navbar />
+            <main className="grow">{children}</main>
+            <Footer />
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );
