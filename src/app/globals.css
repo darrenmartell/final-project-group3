@@ -114,3 +114,7 @@ h6 {
 * {
   border-color: var(--border);
 }
+
+.wordmark {
+  transform: scaleY(1.5) scaleX(1);
+}

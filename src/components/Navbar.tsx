@@ -5,19 +5,28 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 
+import localFont from 'next/font/local'
+
+const clarendonCondensed = localFont({
+  src: '../fonts/clarendoncondensed_bold.otf',
+  display: 'swap',
+})
+
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border supports-[backdrop-filter]:bg-card/60">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border supports-backdrop-filter:bg-card/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <div className="flex shrink-0 items-center">
-            <Link href="/" className="text-2xl font-bold text-foreground">
+          {/* Logo Text */}
+          <Link href="/" className="flex shrink-0 items-center">
+            <span
+              className={`text-2xl md:text-4xl font-bold tracking-widest uppercase inline-block wordmark ${clarendonCondensed.className}`}
+            >
               Shoreline Woodworks
-            </Link>
-          </div>
+            </span>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex flex-1 items-center justify-end space-x-2 pr-4">
@@ -29,7 +38,10 @@ export default function Navbar() {
 
           {/* Right side */}
           <div className="flex shrink-0 items-center gap-3">
-            <ThemeToggle />
+            {/* ThemeToggle only on desktop */}
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -59,12 +71,19 @@ export default function Navbar() {
 
       {/* Mobile Navigation */}
       {isMenuOpen && (
-        <div className="md:hidden border-t border-border bg-card/80 backdrop-blur-md supports-[backdrop-filter]:bg-card/60">
-          <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3">
-            <MobileNavLink href="/" label="Home" onClick={() => setIsMenuOpen(false)} />
-            <MobileNavLink href="/projects" label="Projects" onClick={() => setIsMenuOpen(false)} />
-            <MobileNavLink href="/about" label="About" onClick={() => setIsMenuOpen(false)} />
-            <MobileNavLink href="/contact" label="Contact" onClick={() => setIsMenuOpen(false)} />
+        <div className="md:hidden border-t border-border bg-card/95 backdrop-blur-md">
+          <div className="flex px-2 pb-3 pt-2 sm:px-3">
+            {/* Left column - Nav links */}
+            <div className="flex-1 space-y-1">
+              <MobileNavLink href="/" label="Home" onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/projects" label="Projects" onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/about" label="About" onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/contact" label="Contact" onClick={() => setIsMenuOpen(false)} />
+            </div>
+            {/* Right column - Theme toggle */}
+            <div className="shrink-0 pl-2">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       )}
@@ -81,10 +100,9 @@ function NavLink({ href, label }: { href: string; label: string }) {
       href={href}
       className={`
         px-4 py-2 rounded-lg text-foreground transition-colors
-        ${
-          isActive
-            ? "bg-nav-active text-white"
-            : "hover:bg-nav-hover"
+        ${isActive
+          ? "bg-nav-active text-white"
+          : "hover:bg-nav-hover"
         }
       `}
     >
@@ -111,10 +129,9 @@ function MobileNavLink({
       onClick={onClick}
       className={`
         block rounded-lg px-3 py-2 text-foreground transition-colors
-        ${
-          isActive
-            ? "bg-nav-active text-white"
-            : "hover:bg-nav-hover"
+        ${isActive
+          ? "bg-nav-active text-white"
+          : "hover:bg-nav-hover"
         }
       `}
     >
