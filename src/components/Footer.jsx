@@ -4,27 +4,27 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-white dark:bg-gray-900 shadow-inner mt-auto">
+    <footer className="bg-footer shadow-inner mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
           {/* Business Name */}
           <div>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+            <h3 className="text-xl font-bold text-foreground mb-4">
               Shoreline Woodworks
             </h3>
           </div>
 
           {/* Navigation Links */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-4">
+            <h4 className="text-sm font-semibold text-foreground/60 uppercase tracking-wider mb-4">
               Navigation
             </h4>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/"
-                  className="text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="text-foreground/70 hover:text-foreground transition-colors"
                 >
                   Home
                 </Link>
@@ -32,7 +32,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/projects"
-                  className="text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="text-foreground/70 hover:text-foreground transition-colors"
                 >
                   Projects
                 </Link>
@@ -40,7 +40,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/contact"
-                  className="text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="text-foreground/70 hover:text-foreground transition-colors"
                 >
                   Contact
                 </Link>
@@ -48,16 +48,16 @@ export default function Footer() {
             </ul>
           </div>
 
-          
+          {/* Contact */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-4">
+            <h4 className="text-sm font-semibold text-foreground/60 uppercase tracking-wider mb-4">
               Contact
             </h4>
             <ul className="space-y-2">
               <li>
                 <a
                   href="tel:902-412-7358"
-                  className="flex items-center text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="flex items-center text-foreground/70 hover:text-foreground transition-colors"
                 >
                   <svg
                     className="h-4 w-4 mr-2"
@@ -76,7 +76,7 @@ export default function Footer() {
               <li>
                 <a
                   href="mailto:info@shorelinewoodworks.ca"
-                  className="flex items-center text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="flex items-center text-foreground/70 hover:text-foreground transition-colors"
                 >
                   <svg
                     className="h-4 w-4 mr-2"
@@ -96,9 +96,9 @@ export default function Footer() {
           </div>
         </div>
 
-        
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+        {/* Copyright */}
+        <div className="border-t border-border pt-6">
+          <p className="text-center text-sm text-foreground/60">
             © {currentYear} Shoreline Woodworks. All rights reserved.
           </p>
         </div>
