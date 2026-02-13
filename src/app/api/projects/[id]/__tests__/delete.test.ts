@@ -76,7 +76,7 @@ describe("DELETE /api/projects/[id]", () => {
         });
         const res1 = await DELETE(req1, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req1, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: projectId },
             include: { images: true },
@@ -119,7 +119,7 @@ describe("DELETE /api/projects/[id]", () => {
         });
         const res = await DELETE(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: "nonexistent" },
             include: { images: true },
@@ -149,7 +149,7 @@ describe("DELETE /api/projects/[id]", () => {
         });
         const res = await DELETE(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(res.status).toBe(401);
         const body = await res.json();
         expect(body).toEqual({ error: "Unauthorized" });
@@ -177,7 +177,7 @@ describe("DELETE /api/projects/[id]", () => {
         });
         const res = await DELETE(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(res.status).toBe(403);
         const body = await res.json();
         expect(body).toEqual({ error: "Forbidden" });
@@ -208,7 +208,7 @@ describe("DELETE /api/projects/[id]", () => {
         });
         const res = await DELETE(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: project.id },
             include: { images: true },
@@ -244,7 +244,7 @@ describe("DELETE /api/projects/[id]", () => {
         });
         const res = await DELETE(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: project.id },
             include: { images: true },

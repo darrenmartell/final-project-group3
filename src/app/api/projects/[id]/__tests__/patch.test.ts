@@ -20,7 +20,6 @@ import { prisma } from "@/lib/db";
 import { verifyAdmin } from "@/lib/auth-guards";
 import { uploadImage, deleteImage } from "@/lib/cloudinary";
 import { mockProjects } from "../../__tests__/fixtures";
-import type { ProjectApiResponse } from "@/types/project";
 
 // Mock auth guard used by the PATCH handler so we can simulate admin vs
 // unauthenticated/forbidden outcomes.
@@ -86,7 +85,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
             include: { images: { orderBy: { sortOrder: "asc" } } },
@@ -132,7 +131,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
             include: { images: { orderBy: { sortOrder: "asc" } } },
@@ -169,7 +168,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
             include: { images: { orderBy: { sortOrder: "asc" } } },
@@ -218,7 +217,7 @@ describe("PATCH /api/projects/[id]", () => {
         } as unknown as Request;
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
             include: { images: { orderBy: { sortOrder: "asc" } } },
@@ -269,7 +268,7 @@ describe("PATCH /api/projects/[id]", () => {
         } as unknown as Request;
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
             include: { images: { orderBy: { sortOrder: "asc" } } },
@@ -306,7 +305,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: "nonexistent" },
             include: { images: { orderBy: { sortOrder: "asc" } } },
@@ -338,7 +337,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(res.status).toBe(401);
         const body = await res.json();
         expect(body).toEqual({ error: "Unauthorized" });
@@ -368,7 +367,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(res.status).toBe(403);
         const body = await res.json();
         expect(body).toEqual({ error: "Forbidden" });
@@ -404,7 +403,7 @@ describe("PATCH /api/projects/[id]", () => {
         });
         const res = await PATCH(req, { params });
 
-        expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
+        expect(verifyAdmin).toHaveBeenCalledWith();
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
             include: { images: { orderBy: { sortOrder: "asc" } } },

@@ -591,7 +591,7 @@ describe("POST /api/projects", () => {
 
         g.File = originalFile;
 
-        expect(requireAdmin).toHaveBeenCalledWith(req as unknown as Request);
+        expect(requireAdmin).toHaveBeenCalledWith();
         expect(prisma.project.create).not.toHaveBeenCalled();
         expect(res.status).toBe(500);
         const body = await res.json();

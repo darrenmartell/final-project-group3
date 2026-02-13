@@ -57,7 +57,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
  */
 export async function PATCH(req: Request, { params }: RouteParams) {
   const { id } = await params;
-  const adminResult = await verifyAdmin(req, { params });
+  const adminResult = await verifyAdmin();
   if (!adminResult.ok) {
     return adminResult.response;
   }
@@ -104,8 +104,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       (entry): entry is File => entry instanceof File && entry.size > 0,
     );
 
-    let imageUrl: string | null = existing.imageUrl;
-    let imagePublicId: string | null = existing.imagePublicId;
+    const imageUrl: string | null = existing.imageUrl;
+    const imagePublicId: string | null = existing.imagePublicId;
 
     if (removeImage === "true") {
       // Remove all images, then optionally add new ones
@@ -322,7 +322,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
  */
 export async function DELETE(req: Request, { params }: RouteParams) {
   const { id } = await params;
-  const adminResult = await verifyAdmin(req, { params });
+  const adminResult = await verifyAdmin();
   if (!adminResult.ok) {
     return adminResult.response;
   }

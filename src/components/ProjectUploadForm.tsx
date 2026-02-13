@@ -133,6 +133,10 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
   };
 
   const handleRemoveAllImages = () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to remove all images? This cannot be undone until you save.',
+    );
+    if (!confirmed) return;
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages([]);

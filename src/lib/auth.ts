@@ -12,7 +12,21 @@ type SessionWithUser = NextAuthSession & {
   };
 };
 
-const authorizedEmail = process.env.AUTHORIZED_ADMIN_EMAIL;
+/**
+ * Authorized admin emails from AUTHORIZED_ADMIN_EMAIL (comma-separated or single).
+ * Only these can sign in. Example: AUTHORIZED_ADMIN_EMAIL=one@x.com,two@x.com
+ */
+function getAuthorizedAdminEmails(): Set<string> {
+  const raw = process.env.AUTHORIZED_ADMIN_EMAIL?.trim() ?? "";
+  if (!raw) return new Set<string>();
+  const emails = raw
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  return new Set(emails);
+}
+
+const authorizedAdminEmails = getAuthorizedAdminEmails();
 
 const config = {
   adapter: PrismaAdapter(prisma),
@@ -26,15 +40,13 @@ const config = {
 
   callbacks: {
     async signIn({ user }) {
-      if (!authorizedEmail) {
+      if (authorizedAdminEmails.size === 0) {
         return false;
       }
-
-      return user.email === authorizedEmail;
+      return user.email != null && authorizedAdminEmails.has(user.email);
     },
 
     async session({ session, user }) {
-
       const typedSession = session as SessionWithUser;
 
       if (typedSession.user) {
@@ -54,12 +66,12 @@ const config = {
 
   events: {
     async signIn({ user }) {
-      if (!authorizedEmail || user.email !== authorizedEmail) {
+      if (!user.email || !authorizedAdminEmails.has(user.email)) {
         return;
       }
 
       await prisma.user.updateMany({
-        where: { email: authorizedEmail },
+        where: { email: user.email },
         data: { isAdmin: true },
       });
     },
