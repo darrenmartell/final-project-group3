@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
+interface ProjectImage {
+  id: string;
+  imageUrl: string;
+  imagePublicId: string;
+  sortOrder: number;
+}
+
 interface Project {
   id: string;
   title: string;
@@ -13,6 +20,7 @@ interface Project {
   featured: boolean;
   createdAt: string;
   updatedAt: string;
+  images?: ProjectImage[];
 }
 
 interface ProjectUploadFormProps {
@@ -24,24 +32,44 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
-  const [featured, setFeatured] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<{ url: string; publicId: string }[]>([]);
+  const [thumbnailIndex, setThumbnailIndex] = useState(0);
   const [removeImage, setRemoveImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Pre-fill form when in edit mode
+  // Pre-fill form when in edit mode; fetch full project to get all images
   useEffect(() => {
-    if (editProject) {
-      setTitle(editProject.title);
-      setDescription(editProject.description || '');
-      setCategory(editProject.category || '');
-      setFeatured(editProject.featured);
-      setImagePreview(editProject.imageUrl);
-      setRemoveImage(false);
-    }
+    if (!editProject) return;
+    setTitle(editProject.title);
+    setDescription(editProject.description || '');
+    setCategory(editProject.category || '');
+    const initialImages =
+      editProject.images?.length
+        ? editProject.images.map((i) => ({ url: i.imageUrl, publicId: i.imagePublicId }))
+        : editProject.imageUrl && editProject.imagePublicId
+          ? [{ url: editProject.imageUrl, publicId: editProject.imagePublicId }]
+          : [];
+    setExistingImages(initialImages);
+    const thumbIdx =
+      initialImages.length && editProject.imagePublicId
+        ? initialImages.findIndex((i) => i.publicId === editProject.imagePublicId)
+        : 0;
+    setThumbnailIndex(thumbIdx >= 0 ? thumbIdx : 0);
+    setRemoveImage(false);
+    fetch(`/api/projects/${editProject.id}`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((project: Project | null) => {
+        if (project?.images?.length) {
+          setExistingImages(project.images.map((i) => ({ url: i.imageUrl, publicId: i.imagePublicId })));
+          const idx = project.images.findIndex((i) => i.imagePublicId === project.imagePublicId);
+          setThumbnailIndex(idx >= 0 ? idx : 0);
+        }
+      })
+      .catch(() => {});
   }, [editProject]);
 
   // Auto-dismiss success message after 3 seconds
@@ -54,46 +82,64 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
     }
   }, [success]);
 
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+  const maxSize = 10 * 1024 * 1024; // 10MB
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      setError('Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.');
-      return;
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) {
+        setError('Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.');
+        return;
+      }
+      if (file.size > maxSize) {
+        setError('File size exceeds 10MB limit');
+        return;
+      }
     }
 
-    // Validate file size (10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
-    if (file.size > maxSize) {
-      setError('File size exceeds 10MB limit');
-      return;
-    }
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    setImageFile(file);
+    const newPreviews: string[] = new Array(files.length);
+    let loaded = 0;
+    files.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newPreviews[index] = reader.result as string;
+        loaded++;
+        if (loaded === files.length) {
+          setImagePreviews((prev) => [...prev, ...newPreviews]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    setImageFiles((prev) => [...prev, ...files]);
     setRemoveImage(false);
     setError(null);
+
+    const fileInput = e.target;
+    if (fileInput) fileInput.value = '';
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setRemoveImage(true);
-    
-    // Clear file input
-    const fileInput = document.getElementById('image') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
+  const removeNewImageAt = (index: number) => {
+    const newIndex = existingImages.length + index;
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    if (thumbnailIndex === newIndex) {
+      setThumbnailIndex(0);
+    } else if (thumbnailIndex > newIndex) {
+      setThumbnailIndex((prev) => prev - 1);
     }
+  };
+
+  const handleRemoveAllImages = () => {
+    setImageFiles([]);
+    setImagePreviews([]);
+    setExistingImages([]);
+    setThumbnailIndex(0);
+    setRemoveImage(true);
+    const fileInput = document.getElementById('image') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,15 +155,19 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
       formData.append('title', title);
       formData.append('description', description);
       formData.append('category', category);
-      formData.append('featured', featured.toString());
-      
-      if (imageFile) {
-        formData.append('image', imageFile);
-      }
-      
+      formData.append('featured', 'false');
+
+      imageFiles.forEach((file) => {
+        formData.append('image', file);
+      });
+
       if (removeImage) {
         formData.append('removeImage', 'true');
       }
+
+      const totalImages = existingImages.length + imagePreviews.length;
+      const thumbIdx = totalImages > 0 ? Math.min(thumbnailIndex, totalImages - 1) : 0;
+      formData.append('thumbnailIndex', String(thumbIdx));
 
       // Determine endpoint and method
       const endpoint = editProject 
@@ -128,6 +178,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
       const response = await fetch(endpoint, {
         method,
         body: formData,
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -149,16 +200,13 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
         setTitle('');
         setDescription('');
         setCategory('');
-        setFeatured(false);
-        setImageFile(null);
-        setImagePreview(null);
+        setImageFiles([]);
+        setImagePreviews([]);
+        setExistingImages([]);
+        setThumbnailIndex(0);
         setRemoveImage(false);
-        
-        // Clear file input
         const fileInput = document.getElementById('image') as HTMLInputElement;
-        if (fileInput) {
-          fileInput.value = '';
-        }
+        if (fileInput) fileInput.value = '';
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -234,43 +282,93 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
           />
         </div>
 
-        {/* Featured Checkbox */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="featured"
-            checked={featured}
-            onChange={(e) => setFeatured(e.target.checked)}
-            className="w-4 h-4 text-primary border-input rounded focus:ring-ring"
-          />
-          <label htmlFor="featured" className="ml-2 text-sm font-medium text-foreground">
-            Mark as featured project
-          </label>
-        </div>
-
-        {/* Image Upload Section */}
+        {/* Image Upload Section - multiple images */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
             Project Images
           </label>
-          
-          {imagePreview ? (
-            <div className="relative inline-block">
-              <div className="relative w-full max-w-md h-64 rounded-lg overflow-hidden border border-border">
-                <Image
-                  src={imagePreview}
-                  alt="Preview"
-                  fill
-                  className="object-cover"
-                />
+          <p className="text-xs text-muted-foreground mb-2">
+            Click an image to set it as the project thumbnail (shown in project cards).
+          </p>
+
+          {(existingImages.length > 0 && !removeImage) || imagePreviews.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                {!removeImage &&
+                  existingImages.map((img, index) => (
+                    <button
+                      type="button"
+                      key={`existing-${index}`}
+                      onClick={() => setThumbnailIndex(index)}
+                      title={thumbnailIndex === index ? 'Thumbnail (click another to change)' : 'Set as thumbnail'}
+                      aria-label={thumbnailIndex === index ? 'Current thumbnail' : 'Set as thumbnail'}
+                      className={`relative w-32 h-32 rounded-lg overflow-hidden border-2 shrink-0 transition-colors ${
+                        thumbnailIndex === index
+                          ? 'border-primary ring-2 ring-primary'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <Image src={img.url} alt="" fill className="object-cover" sizes="128px" />
+                      {thumbnailIndex === index && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-primary/90 text-primary-foreground text-xs font-medium py-1 text-center">
+                          Thumbnail
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                {imagePreviews.map((preview, index) => {
+                  const idx = existingImages.length + index;
+                  return (
+                    <div key={`new-${idx}`} className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-border shrink-0 group">
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailIndex(idx)}
+                        title={thumbnailIndex === idx ? 'Thumbnail (click another to change)' : 'Set as thumbnail'}
+                        aria-label={thumbnailIndex === idx ? 'Current thumbnail' : 'Set as thumbnail'}
+                        className={`absolute inset-0 w-full h-full border-2 transition-colors ${
+                          thumbnailIndex === idx ? 'border-primary ring-2 ring-primary' : 'border-transparent'
+                        }`}
+                      />
+                      <Image src={preview} alt="" fill className="object-cover pointer-events-none" sizes="128px" />
+                      {thumbnailIndex === idx && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-primary/90 text-primary-foreground text-xs font-medium py-1 text-center pointer-events-none">
+                          Thumbnail
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeNewImageAt(index)}
+                        className="absolute top-1 right-1 bg-destructive text-destructive-foreground w-6 h-6 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                onClick={handleRemoveImage}
-                className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-3 py-1 rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors shadow-md"
-              >
-                Remove
-              </button>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  id="image"
+                  onChange={handleImageChange}
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  multiple
+                  className="hidden"
+                />
+                <label
+                  htmlFor="image"
+                  className="cursor-pointer inline-block px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors border border-border"
+                >
+                  Add more images
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRemoveAllImages}
+                  className="text-sm text-destructive hover:underline"
+                >
+                  Remove all images
+                </button>
+              </div>
             </div>
           ) : (
             <div className="border-dashed border-2 border-border bg-muted rounded-lg p-8 text-center hover:border-primary transition-colors">
@@ -279,6 +377,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                 id="image"
                 onChange={handleImageChange}
                 accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                multiple
                 className="hidden"
               />
               <label
@@ -288,7 +387,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                 Click to upload images
               </label>
               <p className="text-xs text-muted-foreground mt-2">
-                JPEG, PNG, WebP, or GIF (max 10MB)
+                JPEG, PNG, WebP, or GIF (max 10MB each). You can select multiple files.
               </p>
             </div>
           )}

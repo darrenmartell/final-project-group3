@@ -35,6 +35,9 @@ vi.mock("@/lib/db", () => ({
             findUnique: vi.fn(),
             update: vi.fn(),
         },
+        projectImage: {
+            deleteMany: vi.fn().mockResolvedValue(undefined),
+        },
     },
 }));
 
@@ -61,14 +64,16 @@ describe("PATCH /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const existing = mockProjects[0];
-        const updatedProject: ProjectApiResponse = {
+        const existing = { ...mockProjects[0], images: [] as { id: string; imageUrl: string; imagePublicId: string; sortOrder: number }[] };
+        const updatedProject = {
             ...existing,
             title: "Updated Title",
             updatedAt: "2026-02-12T12:00:00.000Z",
         };
 
-        (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+        (prisma.project.findUnique as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce(existing)
+            .mockResolvedValueOnce(updatedProject);
         (prisma.project.update as ReturnType<typeof vi.fn>).mockResolvedValue(updatedProject);
 
         const formData = new FormData();
@@ -84,6 +89,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(prisma.project.update).toHaveBeenCalledWith({
             where: { id: existing.id },
@@ -92,8 +98,6 @@ describe("PATCH /api/projects/[id]", () => {
                 description: existing.description,
                 category: existing.category,
                 featured: existing.featured,
-                imageUrl: existing.imageUrl,
-                imagePublicId: existing.imagePublicId,
             },
         });
         expect(res.status).toBe(200);
@@ -115,7 +119,7 @@ describe("PATCH /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const existing = mockProjects[0];
+        const existing = { ...mockProjects[0], images: [] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
         const formData = new FormData();
@@ -131,6 +135,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -151,7 +156,7 @@ describe("PATCH /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const existing = mockProjects[0];
+        const existing = { ...mockProjects[0], images: [] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
         const formData = new FormData();
@@ -167,6 +172,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -186,7 +192,7 @@ describe("PATCH /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const existing = mockProjects[0];
+        const existing = { ...mockProjects[0], images: [] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
         const largeFile = new File(
@@ -198,8 +204,11 @@ describe("PATCH /api/projects/[id]", () => {
         const fakeFormData = {
             get(key: string): string | File | null {
                 if (key === "title") return "Valid Title";
-                if (key === "image") return largeFile;
                 return null;
+            },
+            getAll(key: string): File[] {
+                if (key === "image") return [largeFile];
+                return [];
             },
         };
 
@@ -212,6 +221,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -233,7 +243,7 @@ describe("PATCH /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const existing = mockProjects[0];
+        const existing = { ...mockProjects[0], images: [] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
         const svgFile = new File(
@@ -245,8 +255,11 @@ describe("PATCH /api/projects/[id]", () => {
         const fakeFormData = {
             get(key: string): string | File | null {
                 if (key === "title") return "Valid Title";
-                if (key === "image") return svgFile;
                 return null;
+            },
+            getAll(key: string): File[] {
+                if (key === "image") return [svgFile];
+                return [];
             },
         };
 
@@ -259,6 +272,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -295,6 +309,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: "nonexistent" },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(res.status).toBe(404);
         const body = await res.json();
@@ -373,7 +388,7 @@ describe("PATCH /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const existing = mockProjects[0];
+        const existing = { ...mockProjects[0], images: [] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
         (prisma.project.update as ReturnType<typeof vi.fn>).mockRejectedValue(
             new Error("Database connection lost"),
@@ -392,6 +407,7 @@ describe("PATCH /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: existing.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
         expect(prisma.project.update).toHaveBeenCalled();
         expect(res.status).toBe(500);

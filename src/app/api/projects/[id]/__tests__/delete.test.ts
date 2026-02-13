@@ -60,7 +60,7 @@ describe("DELETE /api/projects/[id]", () => {
             user: { isAdmin: true },
         });
 
-        const project = mockProjects[0];
+        const project = { ...mockProjects[0], images: [] as { imagePublicId: string }[] };
         const projectId = project.id;
         const params = Promise.resolve({ id: projectId });
 
@@ -77,7 +77,10 @@ describe("DELETE /api/projects/[id]", () => {
         const res1 = await DELETE(req1, { params });
 
         expect(verifyAdmin).toHaveBeenCalledWith(req1, { params });
-        expect(prisma.project.findUnique).toHaveBeenCalledWith({ where: { id: projectId } });
+        expect(prisma.project.findUnique).toHaveBeenCalledWith({
+            where: { id: projectId },
+            include: { images: true },
+        });
         expect(deleteImage).toHaveBeenCalledWith(project.imagePublicId);
         expect(prisma.project.delete).toHaveBeenCalledWith({ where: { id: projectId } });
         expect(res1.status).toBe(200);
@@ -119,6 +122,7 @@ describe("DELETE /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: "nonexistent" },
+            include: { images: true },
         });
         expect(res.status).toBe(404);
         const body = await res.json();
@@ -191,7 +195,7 @@ describe("DELETE /api/projects/[id]", () => {
             ok: true,
             user: { isAdmin: true },
         });
-        const project = mockProjects[0];
+        const project = { ...mockProjects[0], images: [] as { imagePublicId: string }[] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(project);
         (prisma.project.delete as ReturnType<typeof vi.fn>).mockRejectedValue(
             new Error("Database connection lost"),
@@ -207,6 +211,7 @@ describe("DELETE /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: project.id },
+            include: { images: true },
         });
         expect(deleteImage).toHaveBeenCalledWith(project.imagePublicId);
         expect(prisma.project.delete).toHaveBeenCalledWith({
@@ -227,7 +232,7 @@ describe("DELETE /api/projects/[id]", () => {
             ok: true,
             user: { isAdmin: true },
         });
-        const project = mockProjects[0];
+        const project = { ...mockProjects[0], images: [] as { imagePublicId: string }[] };
         (prisma.project.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(project);
         (deleteImage as ReturnType<typeof vi.fn>).mockRejectedValue(
             new Error("Cloudinary API error"),
@@ -242,6 +247,7 @@ describe("DELETE /api/projects/[id]", () => {
         expect(verifyAdmin).toHaveBeenCalledWith(req, { params });
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
             where: { id: project.id },
+            include: { images: true },
         });
         expect(deleteImage).toHaveBeenCalledWith(project.imagePublicId);
         expect(prisma.project.delete).not.toHaveBeenCalled();

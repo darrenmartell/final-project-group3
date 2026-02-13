@@ -35,7 +35,7 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/projects');
+      const response = await fetch('/api/projects', { credentials: 'include' });
       
       if (!response.ok) {
         throw new Error('Failed to fetch projects');
@@ -60,6 +60,7 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
 
       const response = await fetch(`/api/projects/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (!response.ok) {

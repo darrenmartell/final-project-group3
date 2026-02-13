@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     return adminResult.response;
   }
 
-  let uploadedPublicId: string | null = null;
+  const uploadedPublicIds: string[] = [];
 
   try {
     // 2. Parse FormData from request
@@ -76,7 +76,8 @@ export async function POST(req: Request) {
     const description = formData.get("description");
     const category = formData.get("category");
     const featured = formData.get("featured");
-    const image = formData.get("image");
+    const thumbnailIndexRaw = formData.get("thumbnailIndex");
+    const imageEntries = formData.getAll("image");
 
     // 3. Validate required fields
     if (!title || typeof title !== "string") {
@@ -94,11 +95,13 @@ export async function POST(req: Request) {
       );
     }
 
-    let imageUrl: string | null = null;
-    let imagePublicId: string | null = null;
+    const imageFiles = imageEntries.filter(
+      (entry): entry is File => entry instanceof File && entry.size > 0,
+    );
 
-    // 4. If image provided: validate type and size, convert to Buffer, get imageUrl and imagePublicId
-    if (image instanceof File && image.size > 0) {
+    const uploadedImages: { secureUrl: string; publicId: string }[] = [];
+
+    for (const image of imageFiles) {
       if (!ALLOWED_IMAGE_TYPES.has(image.type)) {
         return NextResponse.json(
           {
@@ -108,22 +111,27 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-
       if (image.size > MAX_IMAGE_SIZE_BYTES) {
         return NextResponse.json(
           { error: "Image file is too large (max 10MB)" },
           { status: 400 },
         );
       }
-
       const buffer = Buffer.from(await image.arrayBuffer());
       const uploaded = await uploadImage(buffer);
-      imageUrl = uploaded.secureUrl;
-      imagePublicId = uploaded.publicId;
-       uploadedPublicId = uploaded.publicId;
+      uploadedPublicIds.push(uploaded.publicId);
+      uploadedImages.push({ secureUrl: uploaded.secureUrl, publicId: uploaded.publicId });
     }
 
-    // 5. Create project in database with Prisma
+    const thumbnailIndex =
+      typeof thumbnailIndexRaw === "string" && /^\d+$/.test(thumbnailIndexRaw)
+        ? Math.min(Math.max(0, parseInt(thumbnailIndexRaw, 10)), Math.max(0, uploadedImages.length - 1))
+        : 0;
+    const chosenImage = uploadedImages[thumbnailIndex] ?? uploadedImages[0] ?? null;
+    const imageUrl = chosenImage?.secureUrl ?? null;
+    const imagePublicId = chosenImage?.publicId ?? null;
+
+    // 5. Create project and project images in a transaction
     const project = await prisma.project.create({
       data: {
         title: titleTrimmed,
@@ -136,21 +144,25 @@ export async function POST(req: Request) {
         featured: typeof featured === "string" ? featured === "true" : false,
         imageUrl,
         imagePublicId,
+        images: {
+          create: uploadedImages.map((img, index) => ({
+            imageUrl: img.secureUrl,
+            imagePublicId: img.publicId,
+            sortOrder: index,
+          })),
+        },
       },
+      include: { images: { orderBy: { sortOrder: "asc" } } },
     });
 
     // 6. Return created project with 201 status
     return NextResponse.json(project, { status: 201 });
   } catch {
-    // Clean up the uploaded image if create failed; surface failure to the client.
-    if (uploadedPublicId) {
+    for (const publicId of uploadedPublicIds) {
       try {
-        await deleteImage(uploadedPublicId);
+        await deleteImage(publicId);
       } catch {
-        return NextResponse.json(
-          { error: "Failed to create project; could not cleanup uploaded image" },
-          { status: 500 },
-        );
+        // best-effort cleanup
       }
     }
     return NextResponse.json(

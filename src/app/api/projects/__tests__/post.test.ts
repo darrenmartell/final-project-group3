@@ -101,7 +101,9 @@ describe("POST /api/projects", () => {
                 featured: true,
                 imageUrl: null,
                 imagePublicId: null,
+                images: { create: [] },
             },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
 
         expect(res.status).toBe(201);
@@ -173,11 +175,13 @@ describe("POST /api/projects", () => {
                         return "Residential";
                     case "featured":
                         return "true";
-                    case "image":
-                        return jpegFile;
                     default:
                         return null;
                 }
+            },
+            getAll(key: string) {
+                if (key === "image") return [jpegFile];
+                return [];
             },
         };
 
@@ -199,7 +203,17 @@ describe("POST /api/projects", () => {
                 featured: true,
                 imageUrl: uploaded.secureUrl,
                 imagePublicId: uploaded.publicId,
+                images: {
+                    create: [
+                        {
+                            imageUrl: uploaded.secureUrl,
+                            imagePublicId: uploaded.publicId,
+                            sortOrder: 0,
+                        },
+                    ],
+                },
             },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
 
         expect(res.status).toBe(201);
@@ -253,7 +267,9 @@ describe("POST /api/projects", () => {
                 featured: false,
                 imageUrl: null,
                 imagePublicId: null,
+                images: { create: [] },
             },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
         });
 
         expect(res.status).toBe(201);
@@ -423,11 +439,13 @@ describe("POST /api/projects", () => {
                         return "Residential";
                     case "featured":
                         return "true";
-                    case "image":
-                        return svgFile;
                     default:
                         return null;
                 }
+            },
+            getAll(key: string) {
+                if (key === "image") return [svgFile];
+                return [];
             },
         };
 
@@ -490,11 +508,13 @@ describe("POST /api/projects", () => {
                         return "Residential";
                     case "featured":
                         return "true";
-                    case "image":
-                        return largeFile;
                     default:
                         return null;
                 }
+            },
+            getAll(key: string) {
+                if (key === "image") return [largeFile];
+                return [];
             },
         };
 
@@ -510,9 +530,72 @@ describe("POST /api/projects", () => {
         expect(prisma.project.create).not.toHaveBeenCalled();
         expect(res.status).toBe(400);
         const body = await res.json();
-        expect(body).toEqual({
-            error: "Image file is too large (max 10MB)",
+        expect(body).toEqual({ error: "Image file is too large (max 10MB)" });
+    });
+
+    it("returns 500 when Cloudinary upload fails", async () => {
+        (requireAdmin as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            ok: true,
+            session: {},
+            response: null,
         });
+
+        (uploadImage as ReturnType<typeof vi.fn>).mockRejectedValue(
+            new Error("Cloudinary upload failed"),
+        );
+
+        class FakeFile {
+            size: number;
+            type: string;
+            constructor(size: number, type: string) {
+                this.size = size;
+                this.type = type;
+            }
+            async arrayBuffer(): Promise<ArrayBuffer> {
+                return new ArrayBuffer(0);
+            }
+        }
+
+        const jpegFile = new FakeFile(1024, "image/jpeg");
+
+        const g = globalThis as unknown as GlobalWithFile;
+        const originalFile = g.File;
+        g.File = FakeFile;
+
+        const fakeFormData = {
+            get(key: string) {
+                switch (key) {
+                    case "title":
+                        return "Image Project";
+                    case "description":
+                        return "Project with image";
+                    case "category":
+                        return "Residential";
+                    case "featured":
+                        return "true";
+                    default:
+                        return null;
+                }
+            },
+            getAll(key: string) {
+                if (key === "image") return [jpegFile];
+                return [];
+            },
+        };
+
+        const req = {
+            formData: async () => fakeFormData,
+        } as unknown as Request;
+
+        const res = await POST(req);
+
+        g.File = originalFile;
+
+        expect(requireAdmin).toHaveBeenCalledWith(req as unknown as Request);
+        expect(prisma.project.create).not.toHaveBeenCalled();
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body).toEqual({ error: "Failed to create project" });
     });
 
     /**
@@ -559,11 +642,13 @@ describe("POST /api/projects", () => {
                         return "Residential";
                     case "featured":
                         return "true";
-                    case "image":
-                        return jpegFile;
                     default:
                         return null;
                 }
+            },
+            getAll(key: string) {
+                if (key === "image") return [jpegFile];
+                return [];
             },
         };
 
@@ -638,11 +723,13 @@ describe("POST /api/projects", () => {
                         return "Residential";
                     case "featured":
                         return "true";
-                    case "image":
-                        return jpegFile;
                     default:
                         return null;
                 }
+            },
+            getAll(key: string) {
+                if (key === "image") return [jpegFile];
+                return [];
             },
         };
 
@@ -719,11 +806,13 @@ describe("POST /api/projects", () => {
                         return "Residential";
                     case "featured":
                         return "true";
-                    case "image":
-                        return jpegFile;
                     default:
                         return null;
                 }
+            },
+            getAll(key: string) {
+                if (key === "image") return [jpegFile];
+                return [];
             },
         };
 
@@ -741,8 +830,6 @@ describe("POST /api/projects", () => {
         expect(deleteImage).toHaveBeenCalledWith(uploaded.publicId);
         expect(res.status).toBe(500);
         const body = await res.json();
-        expect(body).toEqual({
-            error: "Failed to create project; could not cleanup uploaded image",
-        });
+        expect(body).toEqual({ error: "Failed to create project" });
     });
 });
