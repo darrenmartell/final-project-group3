@@ -25,6 +25,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { ProjectApiResponse } from '@/types/project';
 
+/** History state for modal stack: each entry is one modal level (gallery or photo). */
+type ModalHistoryState =
+  | { modal: 'gallery'; projectId: string }
+  | { modal: 'photo'; projectId: string; photoIndex: number }
+  | null;
+
 const PAGE_SIZE = 6;
 const TAG_NONE = '__none__';
 
@@ -46,6 +52,7 @@ function ProjectCard({
   onEdit,
   onDelete,
   onPhotoClick,
+  onGalleryClick,
   deletingId,
 }: {
   project: ProjectApiResponse;
@@ -54,10 +61,16 @@ function ProjectCard({
   onEdit?: (project: ProjectApiResponse) => void;
   onDelete?: (id: string) => void;
   onPhotoClick?: (project: ProjectApiResponse) => void;
+  onGalleryClick?: (project: ProjectApiResponse) => void;
   deletingId?: string | null;
 }) {
   const handleImageClick = () => {
     if (project.imageUrl && onPhotoClick) onPhotoClick(project);
+  };
+  const handleOverlayClick = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onGalleryClick) onGalleryClick(project);
   };
 
   return (
@@ -89,8 +102,13 @@ function ProjectCard({
             Featured
           </span>
         )}
-        {/* Overlay: title, tags, date — pointer-events-none so taps pass through to open photo modal */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/60 to-transparent pt-12 px-3 pb-3 pointer-events-none">
+        {/* Overlay: title, tags, date — click/tap opens gallery modal */}
+        <button
+          type="button"
+          onClick={handleOverlayClick}
+          className="absolute inset-x-0 bottom-0 w-full text-left bg-gradient-to-t from-black/85 via-black/60 to-transparent pt-12 px-3 pb-3 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset touch-manipulation"
+          aria-label={`Open gallery: ${project.title}`}
+        >
           <h4 className="font-bold text-lg text-white drop-shadow-sm">{project.title}</h4>
           <div className="min-h-[1.5rem] flex flex-wrap gap-1.5 mt-1.5 mb-1">
             {project.tags?.map((tag) => (
@@ -105,7 +123,7 @@ function ProjectCard({
           <p className="text-xs text-white/90">
             {formatProjectDate(project.createdAt, project.dateIsMonthOnly)}
           </p>
-        </div>
+        </button>
       </div>
       {project.description && (
         <div className="p-4 pt-2">
@@ -274,7 +292,9 @@ export default function ProjectsPage() {
   const touchStartX = useRef<number | null>(null);
   const touchStartOffset = useRef(0);
   const carouselContainerRef = useRef<HTMLDivElement | null>(null);
-  const photoModalPushedStateRef = useRef(false);
+  const [galleryModalProject, setGalleryModalProject] = useState<ProjectApiResponse | null>(null);
+  const projectsRef = useRef<ProjectApiResponse[]>([]);
+  projectsRef.current = projects;
 
   const maxDisplayCountRef = useRef(PAGE_SIZE);
   maxDisplayCountRef.current = Math.max(maxDisplayCountRef.current, projects.length);
@@ -359,43 +379,83 @@ export default function ProjectsPage() {
     fetchYears();
   }, [fetchTagNames, fetchYears]);
 
-  // Lock body scroll when photo modal is open (mobile-friendly)
+  // Lock body scroll when photo or gallery modal is open (mobile-friendly)
   useEffect(() => {
-    if (photoModalProject) {
+    if (photoModalProject || galleryModalProject) {
       const prev = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = prev;
       };
     }
-  }, [photoModalProject]);
+  }, [photoModalProject, galleryModalProject]);
 
-  // Push history state when photo modal opens so mobile back button closes modal instead of leaving page
+  // Sync modal state from history when user presses back/forward (popstate)
   useEffect(() => {
-    if (!photoModalProject) return;
-    const url = window.location.pathname + window.location.search + window.location.hash;
-    window.history.pushState({ photoModal: true }, '', url);
-    photoModalPushedStateRef.current = true;
-  }, [photoModalProject]);
+    const onPopState = (e: PopStateEvent) => {
+      const state = e.state as ModalHistoryState | null | undefined;
+      const list = projectsRef.current;
 
-  // Handle back button (and history.back()): close modal when our pushed state is popped
-  useEffect(() => {
-    const onPopState = () => {
-      photoModalPushedStateRef.current = false;
-      setPhotoModalProject(null);
+      if (!state || !state.modal) {
+        setGalleryModalProject(null);
+        setPhotoModalProject(null);
+        return;
+      }
+
+      if (state.modal === 'gallery') {
+        const project = list.find((p) => p.id === state.projectId) ?? null;
+        setGalleryModalProject(project);
+        setPhotoModalProject(null);
+        return;
+      }
+
+      if (state.modal === 'photo') {
+        const project = list.find((p) => p.id === state.projectId) ?? null;
+        setPhotoModalProject(project);
+        setPhotoModalIndex(state.photoIndex ?? 0);
+        setPhotoModalDragOffset(0);
+        setPhotoModalIsDragging(false);
+        setGalleryModalProject(null);
+      }
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const closePhotoModal = useCallback(() => {
-    if (photoModalPushedStateRef.current) {
-      photoModalPushedStateRef.current = false;
-      window.history.back();
-    } else {
-      setPhotoModalProject(null);
-    }
+    window.history.back();
   }, []);
+
+  const closeGalleryModal = useCallback(() => {
+    window.history.back();
+  }, []);
+
+  const openGalleryModal = useCallback((project: ProjectApiResponse) => {
+    const url = window.location.pathname + window.location.search + window.location.hash;
+    window.history.pushState({ modal: 'gallery', projectId: project.id } satisfies ModalHistoryState, '', url);
+    setGalleryModalProject(project);
+    setPhotoModalProject(null);
+  }, []);
+
+  const openPhotoModal = useCallback((project: ProjectApiResponse, index: number) => {
+    const url = window.location.pathname + window.location.search + window.location.hash;
+    window.history.pushState({ modal: 'photo', projectId: project.id, photoIndex: index } satisfies ModalHistoryState, '', url);
+    setPhotoModalProject(project);
+    setPhotoModalIndex(index);
+    setPhotoModalDragOffset(0);
+    setPhotoModalIsDragging(false);
+    setGalleryModalProject(null);
+  }, []);
+
+  // Close gallery on Escape
+  useEffect(() => {
+    if (!galleryModalProject) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeGalleryModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [galleryModalProject, closeGalleryModal]);
 
   // Close photo modal on Escape; Arrow keys for carousel
   useEffect(() => {
@@ -693,12 +753,8 @@ export default function ProjectsPage() {
                   isAuthenticated={isAuthenticated}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  onPhotoClick={(project) => {
-                  setPhotoModalProject(project);
-                  setPhotoModalIndex(0);
-                  setPhotoModalDragOffset(0);
-                  setPhotoModalIsDragging(false);
-                }}
+                  onPhotoClick={(project) => openPhotoModal(project, 0)}
+                  onGalleryClick={openGalleryModal}
                   deletingId={deletingId}
                 />
               ))}
@@ -754,6 +810,69 @@ export default function ProjectsPage() {
             )}
           </>
         )}
+
+        {/* Gallery modal: thumbnails for the project; selecting one opens the photo modal at that image */}
+        {galleryModalProject && (() => {
+          const imageUrls =
+            galleryModalProject.images?.length
+              ? galleryModalProject.images.map((i) => i.imageUrl)
+              : galleryModalProject.imageUrl
+                ? [galleryModalProject.imageUrl]
+                : [];
+          if (imageUrls.length === 0) return null;
+          const openPhotoAt = (index: number) => openPhotoModal(galleryModalProject, index);
+          return (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Gallery: ${galleryModalProject.title}`}
+              className="fixed inset-0 z-50 flex flex-col bg-background p-0 sm:p-4 sm:py-6"
+              onClick={() => closeGalleryModal()}
+            >
+              <div className="flex items-center justify-between shrink-0 px-4 py-3 sm:px-0 border-b border-border sm:border-0">
+                <h2 className="text-lg font-semibold text-foreground truncate pr-2">{galleryModalProject.title}</h2>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); closeGalleryModal(); }}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Close gallery"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div
+                className="flex-1 overflow-auto p-4 flex flex-wrap items-start gap-3 sm:gap-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {imageUrls.map((url, i) => (
+                  <div
+                    key={`${url}-${i}`}
+                    className="w-[calc((100%-0.75rem)/2)] sm:w-52 md:w-64 shrink-0"
+                  >
+                    <div className="relative w-full" style={{ paddingBottom: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={() => openPhotoAt(i)}
+                        className="absolute inset-0 rounded-lg overflow-hidden bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full h-full"
+                        aria-label={`View image ${i + 1} of ${imageUrls.length}`}
+                      >
+                        <Image
+                          src={url}
+                          alt={`${galleryModalProject.title} — image ${i + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                        />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Photo lightbox modal with carousel — only used when not in reorder mode (ProjectCard only) */}
         {photoModalProject && (() => {
@@ -813,7 +932,7 @@ export default function ProjectsPage() {
             >
               <button
                 type="button"
-                onClick={() => closePhotoModal()}
+                onClick={(e) => { e.stopPropagation(); closePhotoModal(); }}
                 className="absolute top-4 right-4 z-10 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 aria-label="Close"
               >
