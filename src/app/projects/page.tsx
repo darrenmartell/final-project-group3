@@ -56,8 +56,8 @@ function ProjectCard({
 }) {
   return (
     <div className="bg-card border border-border rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
-      {project.imageUrl && (
-        <div className="relative h-48 bg-muted shrink-0">
+      <div className="relative h-72 bg-muted shrink-0">
+        {project.imageUrl ? (
           <Image
             src={project.imageUrl}
             alt={project.title}
@@ -66,51 +66,58 @@ function ProjectCard({
             className="object-cover"
             priority={priority}
           />
-          {project.featured && (
-            <span className="absolute top-2 right-2 bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium shadow">
-              Featured
-            </span>
-          )}
-        </div>
-      )}
-      <div className="p-4 flex flex-col grow">
-        <h4 className="font-bold text-lg mb-2 text-foreground">{project.title}</h4>
-        <div className="min-h-[1.5rem] flex flex-wrap gap-1.5 mb-2">
-          {project.tags?.map((tag) => (
-            <span
-              key={tag}
-              className="inline-block px-2 py-0.5 rounded bg-primary/15 text-primary text-xs"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        {project.description && (
-          <p className="text-sm text-foreground/80 line-clamp-3">{project.description}</p>
-        )}
-        <p className="text-xs text-muted-foreground mt-2">
-          {formatProjectDate(project.createdAt, project.dateIsMonthOnly)}
-        </p>
-        {isAuthenticated && onEdit && onDelete && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={() => onEdit(project)}
-              className="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg font-medium hover:bg-accent transition-colors text-sm"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(project.id)}
-              disabled={deletingId === project.id}
-              className="flex-1 bg-destructive text-destructive-foreground py-2 px-4 rounded-lg font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            >
-              {deletingId === project.id ? 'Deleting…' : 'Delete'}
-            </button>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/50 text-sm">
+            No image
           </div>
         )}
+        {project.featured && (
+          <span className="absolute top-2 right-2 bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium shadow">
+            Featured
+          </span>
+        )}
+        {/* Overlay: title, tags, date */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/60 to-transparent pt-12 px-3 pb-3">
+          <h4 className="font-bold text-lg text-white drop-shadow-sm">{project.title}</h4>
+          <div className="min-h-[1.5rem] flex flex-wrap gap-1.5 mt-1.5 mb-1">
+            {project.tags?.map((tag) => (
+              <span
+                key={tag}
+                className="inline-block px-2 py-0.5 rounded bg-white/25 text-white text-xs backdrop-blur-sm"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-white/90">
+            {formatProjectDate(project.createdAt, project.dateIsMonthOnly)}
+          </p>
+        </div>
       </div>
+      {project.description && (
+        <div className="p-4 pt-2">
+          <p className="text-sm text-foreground/80 line-clamp-3">{project.description}</p>
+        </div>
+      )}
+      {isAuthenticated && onEdit && onDelete && (
+        <div className="flex gap-2 p-4 pt-2 mt-auto border-t border-border">
+          <button
+            type="button"
+            onClick={() => onEdit(project)}
+            className="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg font-medium hover:bg-accent transition-colors text-sm"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(project.id)}
+            disabled={deletingId === project.id}
+            className="flex-1 bg-destructive text-destructive-foreground py-2 px-4 rounded-lg font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            {deletingId === project.id ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -164,8 +171,8 @@ function SortableProjectCard({
       }`}
       aria-label={isSameDateGroup ? `Drag to reorder: ${project.title}` : `${project.title} (different date)`}
     >
-      {project.imageUrl && (
-        <div className="relative h-48 bg-muted shrink-0">
+      <div className="relative h-72 bg-muted shrink-0">
+        {project.imageUrl ? (
           <Image
             src={project.imageUrl}
             alt={project.title}
@@ -173,51 +180,58 @@ function SortableProjectCard({
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover pointer-events-none"
           />
-          {project.featured && (
-            <span className="absolute top-2 right-2 bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium shadow">
-              Featured
-            </span>
-          )}
-        </div>
-      )}
-      <div className="p-4 flex flex-col grow">
-        <h4 className="font-bold text-lg mb-2 text-foreground">{project.title}</h4>
-        <div className="min-h-[1.5rem] flex flex-wrap gap-1.5 mb-2">
-          {project.tags?.map((tag) => (
-            <span
-              key={tag}
-              className="inline-block px-2 py-0.5 rounded bg-primary/15 text-primary text-xs"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        {project.description && (
-          <p className="text-sm text-foreground/80 line-clamp-3">{project.description}</p>
-        )}
-        <p className="text-xs text-muted-foreground mt-2">
-          {formatProjectDate(project.createdAt, project.dateIsMonthOnly)}
-        </p>
-        {isAuthenticated && onEdit && onDelete && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={() => onEdit(project)}
-              className="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg font-medium hover:bg-accent transition-colors text-sm"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(project.id)}
-              disabled={deletingId === project.id}
-              className="flex-1 bg-destructive text-destructive-foreground py-2 px-4 rounded-lg font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            >
-              {deletingId === project.id ? 'Deleting…' : 'Delete'}
-            </button>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/50 text-sm">
+            No image
           </div>
         )}
+        {project.featured && (
+          <span className="absolute top-2 right-2 bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium shadow">
+            Featured
+          </span>
+        )}
+        {/* Overlay: title, tags, date */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/60 to-transparent pt-12 px-3 pb-3">
+          <h4 className="font-bold text-lg text-white drop-shadow-sm">{project.title}</h4>
+          <div className="min-h-[1.5rem] flex flex-wrap gap-1.5 mt-1.5 mb-1">
+            {project.tags?.map((tag) => (
+              <span
+                key={tag}
+                className="inline-block px-2 py-0.5 rounded bg-white/25 text-white text-xs backdrop-blur-sm"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-white/90">
+            {formatProjectDate(project.createdAt, project.dateIsMonthOnly)}
+          </p>
+        </div>
       </div>
+      {project.description && (
+        <div className="p-4 pt-2">
+          <p className="text-sm text-foreground/80 line-clamp-3">{project.description}</p>
+        </div>
+      )}
+      {isAuthenticated && onEdit && onDelete && (
+        <div className="flex gap-2 p-4 pt-2 mt-auto border-t border-border">
+          <button
+            type="button"
+            onClick={() => onEdit(project)}
+            className="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg font-medium hover:bg-accent transition-colors text-sm"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(project.id)}
+            disabled={deletingId === project.id}
+            className="flex-1 bg-destructive text-destructive-foreground py-2 px-4 rounded-lg font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            {deletingId === project.id ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
