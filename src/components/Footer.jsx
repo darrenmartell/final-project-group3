@@ -27,8 +27,9 @@ export default function Footer() {
                 src={resolvedTheme === "dark" ? "/logo-dark.svg" : "/logo-light.svg"}
                 alt="Shoreline Woodworks"
                 width={200}
-                height={60}
+                height={80}
                 className="h-auto w-full max-w-50"
+                fetchPriority="high"
                 priority
               />
             ) : (

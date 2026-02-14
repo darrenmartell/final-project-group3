@@ -9,7 +9,7 @@ interface Project {
   description: string | null;
   imageUrl: string | null;
   imagePublicId: string | null;
-  category: string | null;
+  tags?: string[];
   featured: boolean;
   createdAt: string;
   updatedAt: string;
@@ -35,7 +35,7 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/projects');
+      const response = await fetch('/api/projects', { credentials: 'include' });
       
       if (!response.ok) {
         throw new Error('Failed to fetch projects');
@@ -60,6 +60,7 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
 
       const response = await fetch(`/api/projects/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -112,7 +113,7 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
   // Projects grid
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {projects.map((project) => (
+      {projects.map((project, projectIndex) => (
         <div
           key={project.id}
           className="bg-card border border-border rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
@@ -124,7 +125,9 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
                 src={project.imageUrl}
                 alt={project.title}
                 fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
+                priority={projectIndex < 3}
               />
               
               {/* Featured Badge */}
@@ -141,11 +144,18 @@ export default function ProjectList({ onEdit }: ProjectListProps) {
             {/* Title */}
             <h4 className="font-bold text-lg mb-2 text-foreground">{project.title}</h4>
 
-            {/* Category */}
-            {project.category && (
-              <p className="text-sm text-muted-foreground mb-2">
-                Category: {project.category}
-              </p>
+            {/* Tags */}
+            {project.tags && project.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {project.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-block px-2 py-0.5 rounded bg-primary/15 text-primary text-xs"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
 
             {/* Description */}
