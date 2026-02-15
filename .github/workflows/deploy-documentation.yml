@@ -1,12 +1,9 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
+name: Deploy Documentation
 
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
-  # Adding a push event here would re-run the CI when the PR is merged
-  pull_request:
+  push:
     branches: [ "main" ]
 
   # Allows you to run this workflow manually from the Actions tab
@@ -14,10 +11,12 @@ on:
 
 permissions: 
   contents: read
+  pages: write
+  id-token: write
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  ci:
+  generate-docs:
     if: github.repository == 'NSCC-ITC-Winter2026-WEBD5020-701-MCr/final-project-group3'
     runs-on: ubuntu-latest
 
@@ -48,24 +47,26 @@ jobs:
           key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
-
-      # Cache Next.js build cache
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: .next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]s', '**/*.[jt]sx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint 
-        run: pnpm run lint
+      - name: Generate TypeDoc documentation
+        run: pnpm typedoc
 
-      - name: Run tests 
-        run: pnpm test
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'docs/generated'
 
-      - name: Run build
-        run: pnpm build
+  deploy:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: generate-docs
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
