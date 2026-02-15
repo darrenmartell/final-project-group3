@@ -14,6 +14,8 @@ on:
 
 permissions: 
   contents: read
+  pages: write
+  id-token: write
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -79,6 +81,7 @@ jobs:
           path: 'docs/generated'
 
   deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: ci
     environment:
       name: github-pages
