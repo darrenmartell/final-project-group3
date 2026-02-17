@@ -1,3 +1,19 @@
+/**
+ * @module app/contact/contactInformation
+ * @description Contact information display component.
+ */
+
+/**
+ * Contact information component displaying business contact details.
+ * Shows phone number, email address, and location with icons.
+ *
+ * @returns The contact information JSX element
+ *
+ * @example
+ * ```tsx
+ * <ContactInformation />
+ * ```
+ */
 export default function ContactInformation() {
   return (
     <div className="bg-card rounded-lg shadow-lg p-8 border border-border">

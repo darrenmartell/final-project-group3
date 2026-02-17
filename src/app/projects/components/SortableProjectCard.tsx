@@ -1,3 +1,7 @@
+/**
+ * @module app/projects/components/SortableProjectCard
+ * @description Draggable project card for reorder mode using dnd-kit.
+ */
 'use client';
 
 import Image from 'next/image';
@@ -6,6 +10,31 @@ import { CSS } from '@dnd-kit/utilities';
 import { formatProjectDate } from '../constants';
 import type { ProjectApiResponse } from '@/types/project';
 
+/**
+ * Sortable project card component for drag-and-drop reordering.
+ * Uses dnd-kit for drag functionality. Cards can only be reordered
+ * within the same date group.
+ *
+ * @param props - Component props
+ * @param props.project - The project data to display
+ * @param props.dateKeyOfDragged - Date key (YYYY-MM-DD) of the currently dragged card
+ * @param props.isAuthenticated - Whether user is authenticated
+ * @param props.onEdit - Callback when edit button is clicked
+ * @param props.onDelete - Callback when delete button is clicked
+ * @param props.deletingId - ID of project currently being deleted
+ * @returns The sortable project card JSX element
+ *
+ * @example
+ * ```tsx
+ * <SortableProjectCard
+ *   project={project}
+ *   dateKeyOfDragged={draggingDateKey}
+ *   isAuthenticated={true}
+ *   onEdit={handleEdit}
+ *   onDelete={handleDelete}
+ * />
+ * ```
+ */
 export default function SortableProjectCard({
   project,
   dateKeyOfDragged,

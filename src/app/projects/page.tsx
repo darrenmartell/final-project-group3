@@ -1,3 +1,7 @@
+/**
+ * @module app/projects/page
+ * @description Projects gallery page with filtering, reordering, and modals.
+ */
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -30,6 +34,18 @@ import ProjectsReorderBar from './components/ProjectsReorderBar';
 import GalleryModal from './components/GalleryModal';
 import PhotoModal from './components/PhotoModal';
 
+/**
+ * Projects gallery page component.
+ * Features:
+ * - Grid display of project cards with images
+ * - Tag and year filtering
+ * - Infinite scroll pagination
+ * - Admin: drag-and-drop reordering within date groups
+ * - Admin: create, edit, and delete projects
+ * - Gallery and photo modals with swipe navigation
+ *
+ * @returns The projects page JSX element
+ */
 export default function ProjectsPage() {
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';

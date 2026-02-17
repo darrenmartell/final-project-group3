@@ -1,17 +1,54 @@
+/**
+ * @module app/projects/components/TagInput
+ * @description Tag input component with autocomplete suggestions.
+ */
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
+/**
+ * Props for the TagInput component.
+ */
 interface TagInputProps {
+  /** Current array of tag values */
   value: string[];
+  /** Callback when tags change */
   onChange: (tags: string[]) => void;
+  /** Placeholder text when no tags are entered */
   placeholder?: string;
+  /** Static list of suggestion options */
   suggestions?: string[];
+  /** Async function to fetch suggestions based on query */
   fetchSuggestions?: (query: string) => Promise<string[]>;
+  /** Additional CSS classes */
   className?: string;
+  /** HTML id attribute for the input */
   id?: string;
 }
 
+/**
+ * Tag input component with autocomplete suggestions.
+ * Features:
+ * - Comma-separated tag entry
+ * - Autocomplete dropdown with keyboard navigation
+ * - Static or async suggestion fetching
+ * - Duplicate prevention (case-insensitive)
+ * - Backspace to remove last tag
+ * - Click outside to commit current input
+ *
+ * @param props - Component props
+ * @returns The tag input JSX element
+ *
+ * @example
+ * ```tsx
+ * <TagInput
+ *   value={tags}
+ *   onChange={setTags}
+ *   fetchSuggestions={(q) => fetch(`/api/tags?q=${q}`).then(r => r.json())}
+ *   placeholder="Add tags..."
+ * />
+ * ```
+ */
 export default function TagInput({
   value,
   onChange,

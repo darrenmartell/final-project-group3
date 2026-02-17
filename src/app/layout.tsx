@@ -1,3 +1,8 @@
+/**
+ * @module app/layout
+ * @description Root layout component for the Next.js application.
+ * Provides global styling, fonts, theme support, and authentication context.
+ */
 import type { Metadata } from "next";
 import { Merriweather, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
@@ -8,12 +13,14 @@ import DynamicFavicon from "@/components/DynamicFavicon";
 import { ThemeProvider } from "next-themes";
 import Providers from "@/components/Providers";
 
+/** Source Sans 3 font configuration for sans-serif typography */
 const sans = Source_Sans_3({
   subsets: ["latin"],
   variable: "--font-sans-next",
   display: "swap",
 });
 
+/** Merriweather font configuration for serif typography */
 const serif = Merriweather({
   subsets: ["latin"],
   weight: ["400", "700"],
@@ -64,6 +71,19 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Root layout component that wraps all pages.
+ * Provides:
+ * - Global fonts (Source Sans 3 and Merriweather)
+ * - Theme provider with system preference support
+ * - Authentication session provider
+ * - Dynamic favicon based on theme
+ * - Navbar and Footer on all pages
+ *
+ * @param props - Component props
+ * @param props.children - Page content to render
+ * @returns The root HTML structure with providers and layout elements
+ */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {

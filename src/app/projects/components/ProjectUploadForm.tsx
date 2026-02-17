@@ -1,17 +1,33 @@
+/**
+ * @module app/projects/components/ProjectUploadForm
+ * @description Form component for creating and editing projects with image upload.
+ */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import TagInput from './TagInput';
 
-/** Full image from GET /api/projects/[id]; list API may only return { imageUrl }. */
+/**
+ * Full image data from GET /api/projects/[id].
+ * List API may only return `{ imageUrl }`.
+ * @internal
+ */
 interface ProjectImage {
+  /** URL of the image */
   imageUrl: string;
+  /** Database ID of the image record */
   id?: string;
+  /** Cloudinary public ID */
   imagePublicId?: string;
+  /** Sort order in the gallery */
   sortOrder?: number;
 }
 
+/**
+ * Project data structure for the upload form.
+ * @internal
+ */
 interface Project {
   id: string;
   title: string;
@@ -25,11 +41,38 @@ interface Project {
   images?: ProjectImage[];
 }
 
+/**
+ * Props for the ProjectUploadForm component.
+ */
 interface ProjectUploadFormProps {
+  /** Callback when project is successfully created/updated */
   onSuccess?: (project: Project) => void;
+  /** Existing project to edit (null for new project) */
   editProject?: Project | null;
 }
 
+/**
+ * Project upload form component for creating and editing projects.
+ * Features:
+ * - Collapsible form panel
+ * - Multi-image upload with drag-and-drop reordering
+ * - Thumbnail selection from uploaded images
+ * - Tag input with autocomplete suggestions
+ * - Project date picker with validation
+ * - Featured project toggle
+ * - Client-side image upload progress tracking
+ *
+ * @param props - Component props
+ * @returns The upload form JSX element
+ *
+ * @example
+ * ```tsx
+ * <ProjectUploadForm
+ *   onSuccess={(project) => refreshProjects()}
+ *   editProject={selectedProject}
+ * />
+ * ```
+ */
 export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUploadFormProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [title, setTitle] = useState('');
