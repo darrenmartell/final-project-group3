@@ -1,9 +1,21 @@
+/**
+ * @file Admin dashboard page
+ * @module app/admin/page
+ */
+
 'use client';
 
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import SettingsTab from './components/SettingsTab';
 
+/**
+ * Admin dashboard page component.
+ * Displays the admin interface for managing categories and tags.
+ * Requires authentication and redirects unauthenticated users to the login page.
+ *
+ * @returns The admin dashboard page component
+ */
 export default function AdminPage() {
   const { status } = useSession();
 

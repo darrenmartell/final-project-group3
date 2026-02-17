@@ -1,13 +1,28 @@
+/**
+ * @file Settings tab component for managing tags
+ * @module app/admin/components/SettingsTab
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 
+/**
+ * Represents a tag with its associated project count
+ */
 interface TagWithCount {
   id: string;
   name: string;
   projectCount: number;
 }
 
+/**
+ * Settings tab component for managing project tags.
+ * Provides functionality to view, edit, and delete tags used for categorizing projects.
+ * Shows project counts for each tag and warns when deleting tags in use.
+ *
+ * @returns The SettingsTab component
+ */
 export default function SettingsTab() {
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +32,10 @@ export default function SettingsTab() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  /**
+   * Fetches all tags with their project counts from the API.
+   * Updates the tags state and handles loading/error states.
+   */
   const fetchTags = async () => {
     try {
       setLoading(true);
@@ -36,16 +55,28 @@ export default function SettingsTab() {
     fetchTags();
   }, []);
 
+  /**
+   * Starts editing mode for a specific tag.
+   *
+   * @param tag - The tag to edit
+   */
   const startEdit = (tag: TagWithCount) => {
     setEditingId(tag.id);
     setEditName(tag.name);
   };
 
+  /**
+   * Cancels the current edit operation and clears the edit state.
+   */
   const cancelEdit = () => {
     setEditingId(null);
     setEditName('');
   };
 
+  /**
+   * Saves the edited tag name to the database via API call.
+   * Refetches tags on success and shows an alert on failure.
+   */
   const saveEdit = async () => {
     if (!editingId || !editName.trim()) return;
     setSaving(true);
@@ -69,6 +100,12 @@ export default function SettingsTab() {
     }
   };
 
+  /**
+   * Deletes a tag after user confirmation.
+   * If the tag is in use, prompts for confirmation before removing from all projects.
+   *
+   * @param tag - The tag to delete
+   */
   const deleteTag = async (tag: TagWithCount) => {
     if (tag.projectCount > 0) {
       const ok = window.confirm(

@@ -1,5 +1,19 @@
+/**
+ * @file Admin authentication error page
+ * @module app/admin/error/page
+ */
+
 import Link from "next/link";
 
+/**
+ * Admin error page component.
+ * Displays authentication errors with appropriate messages based on the error type.
+ * Provides a link back to the login page.
+ *
+ * @param props - Component props
+ * @param props.searchParams - Promise containing URL search parameters
+ * @returns The admin error page component
+ */
 export default async function AdminError({
   searchParams,
 }: {
