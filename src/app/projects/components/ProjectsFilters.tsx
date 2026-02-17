@@ -1,17 +1,52 @@
+/**
+ * @module app/projects/components/ProjectsFilters
+ * @description Filter controls for the projects gallery.
+ */
 'use client';
 
 import { TAG_NONE } from '../constants';
 
+/**
+ * Props for the ProjectsFilters component.
+ */
 type Props = {
+  /** Available tag names for filtering */
   tagNames: string[];
+  /** Available years for filtering */
   years: number[];
+  /** Currently selected tag (null = all, TAG_NONE = untagged) */
   selectedTag: string | null;
+  /** Currently selected year (null = all time) */
   selectedYear: number | null;
+  /** Whether reorder mode is active (hides filters) */
   isReorderMode: boolean;
+  /** Callback when tag filter changes */
   onTagChange: (tag: string | null) => void;
+  /** Callback when year filter changes */
   onYearChange: (year: number | null) => void;
 };
 
+/**
+ * Filter controls component for the projects gallery.
+ * Displays tag buttons and year dropdown for filtering projects.
+ * Shows reorder mode message when in reorder mode.
+ *
+ * @param props - Component props
+ * @returns The filters JSX element
+ *
+ * @example
+ * ```tsx
+ * <ProjectsFilters
+ *   tagNames={['Featured', 'New']}
+ *   years={[2026, 2025]}
+ *   selectedTag={null}
+ *   selectedYear={null}
+ *   isReorderMode={false}
+ *   onTagChange={setSelectedTag}
+ *   onYearChange={setSelectedYear}
+ * />
+ * ```
+ */
 export default function ProjectsFilters({
   tagNames,
   years,

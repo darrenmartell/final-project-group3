@@ -1,22 +1,61 @@
+/**
+ * @module app/projects/components/PhotoModal
+ * @description Full-screen photo viewer with carousel navigation.
+ */
 'use client';
 
 import { useRef } from 'react';
 import Image from 'next/image';
 import type { ProjectApiResponse } from '@/types/project';
 
+/**
+ * Props for the PhotoModal component.
+ */
 type Props = {
+  /** The project containing the images */
   project: ProjectApiResponse;
+  /** Array of image URLs to display in carousel */
   imageUrls: string[];
+  /** Current image index in the carousel */
   index: number;
+  /** Callback to change the current image index */
   onIndexChange: (index: number) => void;
+  /** Current drag offset in pixels (for swipe animation) */
   dragOffset: number;
+  /** Callback to update drag offset during swipe */
   onDragOffsetChange: (offset: number) => void;
+  /** Whether user is currently dragging/swiping */
   isDragging: boolean;
+  /** Callback to update dragging state */
   onIsDraggingChange: (value: boolean) => void;
+  /** Ref to the carousel container for width calculations */
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Callback when modal should close */
   onClose: () => void;
 };
 
+/**
+ * Full-screen photo modal with carousel navigation.
+ * Supports:
+ * - Touch swipe navigation on mobile
+ * - Arrow button navigation on desktop
+ * - Keyboard navigation (handled by parent)
+ *
+ * @param props - Component props
+ * @returns The photo modal JSX element, or null if no images
+ *
+ * @example
+ * ```tsx
+ * <PhotoModal
+ *   project={selectedProject}
+ *   imageUrls={['/img1.jpg', '/img2.jpg']}
+ *   index={0}
+ *   onIndexChange={setIndex}
+ *   {...dragProps}
+ *   onClose={() => setPhotoOpen(false)}
+ * />
+ * ```
+ */
 export default function PhotoModal({
   project,
   imageUrls,

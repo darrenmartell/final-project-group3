@@ -1,3 +1,19 @@
+/**
+ * @module app/contact/contactForm
+ * @description Contact form component for user inquiries.
+ */
+
+/**
+ * Contact form component with fields for name, email, phone, and message.
+ * Provides a styled form interface for visitors to send messages.
+ *
+ * @returns The contact form JSX element
+ *
+ * @example
+ * ```tsx
+ * <ContactForm />
+ * ```
+ */
 export default function ContactForm() {
   return (
     <div className="bg-card rounded-lg shadow-lg p-8 border border-border">

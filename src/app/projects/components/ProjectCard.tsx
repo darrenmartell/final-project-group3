@@ -1,9 +1,42 @@
+/**
+ * @module app/projects/components/ProjectCard
+ * @description Project card component for displaying project thumbnails in the gallery grid.
+ */
 'use client';
 
 import Image from 'next/image';
 import { formatProjectDate } from '../constants';
 import type { ProjectApiResponse } from '@/types/project';
 
+/**
+ * Project card component displaying a project thumbnail with metadata.
+ * Shows:
+ * - Project image with featured badge if applicable
+ * - Title, tags, and date overlay
+ * - Optional description
+ * - Admin: edit and delete buttons
+ *
+ * @param props - Component props
+ * @param props.project - The project data to display
+ * @param props.priority - Whether to prioritize image loading (for above-fold cards)
+ * @param props.isAuthenticated - Whether user is authenticated (shows admin controls)
+ * @param props.onEdit - Callback when edit button is clicked
+ * @param props.onDelete - Callback when delete button is clicked
+ * @param props.onPhotoClick - Callback when image is clicked (opens photo modal)
+ * @param props.onGalleryClick - Callback when overlay is clicked (opens gallery modal)
+ * @param props.deletingId - ID of project currently being deleted (shows loading state)
+ * @returns The project card JSX element
+ *
+ * @example
+ * ```tsx
+ * <ProjectCard
+ *   project={project}
+ *   isAuthenticated={true}
+ *   onEdit={handleEdit}
+ *   onDelete={handleDelete}
+ * />
+ * ```
+ */
 export default function ProjectCard({
   project,
   priority = false,

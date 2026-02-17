@@ -1,13 +1,44 @@
+/**
+ * @module app/projects/components/ProjectsReorderBar
+ * @description Admin toolbar for entering/exiting project reorder mode.
+ */
 'use client';
 
+/**
+ * Props for the ProjectsReorderBar component.
+ */
 type Props = {
+  /** Whether reorder mode is currently active */
   isReorderMode: boolean;
+  /** Whether the new order is being saved */
   isSavingOrder: boolean;
+  /** Callback to enter reorder mode */
   onEnterReorderMode: () => void;
+  /** Callback to cancel reordering and restore original order */
   onCancelReorder: () => void;
+  /** Callback to save the new order */
   onSaveOrder: () => void;
 };
 
+/**
+ * Admin toolbar for project reordering.
+ * Shows "Edit order" button when not in reorder mode,
+ * or Cancel/Save buttons when reordering.
+ *
+ * @param props - Component props
+ * @returns The reorder bar JSX element
+ *
+ * @example
+ * ```tsx
+ * <ProjectsReorderBar
+ *   isReorderMode={isReorderMode}
+ *   isSavingOrder={isSaving}
+ *   onEnterReorderMode={() => setIsReorderMode(true)}
+ *   onCancelReorder={handleCancel}
+ *   onSaveOrder={handleSave}
+ * />
+ * ```
+ */
 export default function ProjectsReorderBar({
   isReorderMode,
   isSavingOrder,

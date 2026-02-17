@@ -1,8 +1,18 @@
+/**
+ * @module app/projects/components/GalleryModal
+ * @description Full-screen gallery modal showing all project images as a grid.
+ */
 'use client';
 
 import Image from 'next/image';
 import type { ProjectApiResponse } from '@/types/project';
 
+/**
+ * Extract image URLs from a project, falling back to single imageUrl if no images array.
+ * @param project - The project to extract images from
+ * @returns Array of image URLs
+ * @internal
+ */
 function getImageUrls(project: ProjectApiResponse): string[] {
   if (project.images?.length) {
     return project.images.map((i) => i.imageUrl);
@@ -11,12 +21,34 @@ function getImageUrls(project: ProjectApiResponse): string[] {
   return [];
 }
 
+/**
+ * Props for the GalleryModal component.
+ */
 type Props = {
+  /** The project whose images to display */
   project: ProjectApiResponse;
+  /** Callback when modal should close */
   onClose: () => void;
+  /** Callback when a photo thumbnail is clicked */
   onOpenPhoto: (index: number) => void;
 };
 
+/**
+ * Full-screen gallery modal displaying all project images in a grid.
+ * Clicking an image opens the photo modal for that image.
+ *
+ * @param props - Component props
+ * @returns The gallery modal JSX element, or null if no images
+ *
+ * @example
+ * ```tsx
+ * <GalleryModal
+ *   project={selectedProject}
+ *   onClose={() => setGalleryOpen(false)}
+ *   onOpenPhoto={(index) => setPhotoIndex(index)}
+ * />
+ * ```
+ */
 export default function GalleryModal({ project, onClose, onOpenPhoto }: Props) {
   const imageUrls = getImageUrls(project);
   if (imageUrls.length === 0) return null;
