@@ -1,17 +1,39 @@
+/**
+ * @file Our Story section component for the About page
+ * @module app/about/story
+ */
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+/** Default heading displayed when no custom heading is set */
 const DEFAULT_HEADING = 'Our Story';
+
+/** Default body text displayed when no custom body is set */
 const DEFAULT_BODY = `This is where you add your story.`;
 
+/**
+ * Props for the Story component
+ */
 type Props = {
+  /** The initial heading value from the database, or null if not set */
   initialHeading: string | null;
+  /** The initial body text from the database, or null if not set */
   initialBody: string | null;
+  /** Whether the current user has admin privileges */
   isAdmin: boolean;
 };
 
+/**
+ * Our Story section component with editable heading and body text.
+ * Allows admin users to edit and save the company story via inline editing.
+ * Supports multi-paragraph formatting with double newlines.
+ *
+ * @param props - Component props
+ * @returns The Story section component
+ */
 export default function Story({
   initialHeading,
   initialBody,
@@ -27,6 +49,10 @@ export default function Story({
   const displayBody = initialBody ?? DEFAULT_BODY;
   const paragraphs = displayBody.trim().split(/\n\n+/).filter(Boolean);
 
+  /**
+   * Saves the edited heading and body to the database via API calls.
+   * Refreshes the router to display updated content.
+   */
   async function handleSave() {
     setSaving(true);
     try {
@@ -49,6 +75,9 @@ export default function Story({
     }
   }
 
+  /**
+   * Cancels the editing mode and resets the form to initial values.
+   */
   function handleCancel() {
     setHeading(initialHeading ?? DEFAULT_HEADING);
     setBody(initialBody ?? DEFAULT_BODY);

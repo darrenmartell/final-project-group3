@@ -1,11 +1,22 @@
+/**
+ * @file What We Do section component for the About page
+ * @module app/about/what-we-do
+ */
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+/**
+ * Represents a single card in the What We Do section
+ */
 export type WhatWeDoCard = { title: string; description: string };
 
+/** Default heading displayed when no custom heading is set */
 const DEFAULT_HEADING = 'What We Do';
+
+/** Default service cards displayed when no custom cards are set */
 const DEFAULT_CARDS: WhatWeDoCard[] = [
   { title: 'Custom Stairs & Railings', description: 'Hand-crafted staircases and railings designed to complement any home aesthetic.' },
   { title: 'Millwork & Cabinetry', description: 'Built-in cabinets, shelving, and architectural millwork tailored to your vision.' },
@@ -15,12 +26,26 @@ const DEFAULT_CARDS: WhatWeDoCard[] = [
   { title: 'Design Consultation', description: 'Personalized consultations to bring your vision to life.' },
 ];
 
+/**
+ * Props for the WhatWeDo component
+ */
 type Props = {
+  /** The initial heading value from the database, or null if not set */
   initialHeading: string | null;
+  /** The initial array of service cards from the database, or null if not set */
   initialCards: WhatWeDoCard[] | null;
+  /** Whether the current user has admin privileges */
   isAdmin: boolean;
 };
 
+/**
+ * What We Do section component with editable service cards.
+ * Allows admin users to edit and save service information via inline editing.
+ * Displays services in a responsive grid layout.
+ *
+ * @param props - Component props
+ * @returns The What We Do section component
+ */
 export default function WhatWeDo({
   initialHeading,
   initialCards,
@@ -37,6 +62,10 @@ export default function WhatWeDo({
   const displayHeading = initialHeading ?? DEFAULT_HEADING;
   const displayCards = (initialCards?.length ? initialCards : DEFAULT_CARDS) as WhatWeDoCard[];
 
+  /**
+   * Saves the edited heading and cards to the database as JSON via API call.
+   * Refreshes the router to display updated content.
+   */
   async function handleSave() {
     setSaving(true);
     try {
@@ -55,12 +84,22 @@ export default function WhatWeDo({
     }
   }
 
+  /**
+   * Cancels the editing mode and resets the form to initial values.
+   */
   function handleCancel() {
     setHeading(initialHeading ?? DEFAULT_HEADING);
     setCards(initialCards?.length ? initialCards : DEFAULT_CARDS);
     setEditing(false);
   }
 
+  /**
+   * Updates a specific field of a card at the given index.
+   *
+   * @param index - The index of the card to update
+   * @param field - The field to update ('title' or 'description')
+   * @param value - The new value for the field
+   */
   function updateCard(index: number, field: 'title' | 'description', value: string) {
     setCards((prev) => {
       const next = [...prev];

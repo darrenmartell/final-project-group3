@@ -1,17 +1,38 @@
+/**
+ * @file About page hero section component with editable title and tagline
+ * @module app/about/about-hero
+ */
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+/** Default title displayed when no custom title is set */
 const DEFAULT_TITLE = 'About Shoreline Woodworks';
+
+/** Default tagline displayed when no custom tagline is set */
 const DEFAULT_TAGLINE = 'Learn all about us — our craft, materials, and services.';
 
+/**
+ * Props for the AboutHero component
+ */
 type Props = {
+  /** The initial title value from the database, or null if not set */
   initialTitle: string | null;
+  /** The initial tagline value from the database, or null if not set */
   initialTagline: string | null;
+  /** Whether the current user has admin privileges */
   isAdmin: boolean;
 };
 
+/**
+ * Hero section for the About page with editable title and tagline.
+ * Allows admin users to edit and save the page title and tagline via inline editing.
+ *
+ * @param props - Component props
+ * @returns The About hero section component
+ */
 export default function AboutHero({
   initialTitle,
   initialTagline,
@@ -26,6 +47,10 @@ export default function AboutHero({
   const displayTitle = initialTitle ?? DEFAULT_TITLE;
   const displayTagline = initialTagline ?? DEFAULT_TAGLINE;
 
+  /**
+   * Saves the edited title and tagline to the database via API calls.
+   * Refreshes the router to display updated content.
+   */
   async function handleSave() {
     setSaving(true);
     try {
@@ -48,6 +73,9 @@ export default function AboutHero({
     }
   }
 
+  /**
+   * Cancels the editing mode and resets the form to initial values.
+   */
   function handleCancel() {
     setTitle(initialTitle ?? DEFAULT_TITLE);
     setTagline(initialTagline ?? DEFAULT_TAGLINE);

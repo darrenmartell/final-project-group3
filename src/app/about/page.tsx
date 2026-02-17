@@ -1,9 +1,15 @@
+/**
+ * @file About page - main entry point for the about section
+ * @module app/about/page
+ */
+
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import AboutHero from './about-hero';
 import Story from './story';
 import WhatWeDo from './what-we-do';
 
+/** Array of site setting keys used on the About page */
 const ABOUT_KEYS = [
   'about.pageTitle',
   'about.pageTagline',
@@ -12,8 +18,17 @@ const ABOUT_KEYS = [
   'about.whatWeDo',
 ] as const;
 
+/**
+ * Type representing the structure of the "What We Do" data stored in the database
+ */
 type WhatWeDoStored = { heading: string; cards: { title: string; description: string }[] };
 
+/**
+ * Parses and validates the "What We Do" JSON string from the database.
+ *
+ * @param raw - The raw JSON string from the database, or null
+ * @returns The parsed and validated WhatWeDoStored object, or null if invalid
+ */
 function parseWhatWeDo(raw: string | null): WhatWeDoStored | null {
   if (raw == null || raw === '') return null;
   try {
@@ -29,6 +44,13 @@ function parseWhatWeDo(raw: string | null): WhatWeDoStored | null {
   }
 }
 
+/**
+ * About page component that displays the company's story, services, and information.
+ * Fetches site settings from the database and passes them to child components.
+ * Includes admin editing capabilities when user is authenticated as admin.
+ *
+ * @returns The About page component
+ */
 export default async function About() {
   const [session, settingsRows] = await Promise.all([
     auth(),
