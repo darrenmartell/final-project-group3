@@ -3,6 +3,7 @@
  * @description Home page component displaying the landing hero section.
  */
 import LandingHeader from "@/app/components/LandingHeader";
+import RecentProjects from '@/components/RecentProjects';
 
 /**
  * Home page component.
@@ -12,8 +13,11 @@ import LandingHeader from "@/app/components/LandingHeader";
  */
 export default function Home() {
   return (
-    <main className="min-h-screen">
-      <LandingHeader />
-    </main>
+    <div className="pt-16">
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <h1 className="text-4xl font-bold mb-4">Shoreline Woodworks</h1>
+        <RecentProjects />
+      </div>
+    </div>
   );
 }
