@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "../route";
 import { prisma } from "@/lib/db";
+import { toDisplayUrl } from "@/lib/cloudinary";
 import { mockProjects } from "../../../../../../tests/fixtures/projects";
 
 // Mock auth to avoid pulling in next-auth/next during tests; the GET [id]
@@ -69,7 +70,12 @@ describe("GET /api/projects/[id]", () => {
             });
             expect(res.status).toBe(200);
             const body = await res.json();
-            expect(body).toEqual({ ...project, images: [], tags: project.tags ?? [] });
+            expect(body).toEqual({
+                ...project,
+                imageUrl: project.imageUrl ? toDisplayUrl(project.imageUrl) : null,
+                images: [],
+                tags: project.tags ?? [],
+            });
         }
     });
 

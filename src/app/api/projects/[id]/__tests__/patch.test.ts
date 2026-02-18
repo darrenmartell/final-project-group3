@@ -45,10 +45,15 @@ vi.mock("@/lib/db", () => ({
 }));
 
 // Mock Cloudinary so we avoid real uploads/deletions and only assert calls.
+// toDisplayUrl is used when building the PATCH response.
 vi.mock("@/lib/cloudinary", () => ({
     uploadImage: vi.fn(),
     deleteImage: vi.fn(),
     DEFAULT_PROJECTS_FOLDER: "projects",
+    toDisplayUrl: (url: string) =>
+        url && typeof url === "string"
+            ? url.replace("/image/upload/", "/image/upload/f_auto/")
+            : url,
 }));
 
 // Mock tags lib for PATCH handler

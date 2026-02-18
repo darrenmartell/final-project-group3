@@ -282,6 +282,110 @@ export async function deleteFolder(folder: string | null | undefined): Promise<v
 }
 
 /**
+ * List all image resources under a prefix (e.g. "projects/"). Paginates through results.
+ * Used by cleanup to find orphaned project folders.
+ *
+ * @param prefix - Prefix (folder path) to list, e.g. "projects/"
+ * @returns Array of { public_id, created_at } (created_at is ISO string from Cloudinary)
+ */
+export async function listResourcesByPrefix(prefix: string): Promise<{ public_id: string; created_at: string }[]> {
+  const results: { public_id: string; created_at: string }[] = [];
+  let nextCursor: string | undefined;
+  do {
+    const opts: { prefix: string; max_results: number; type: string; next_cursor?: string } = {
+      prefix,
+      max_results: 500,
+      type: "upload",
+    };
+    if (nextCursor) opts.next_cursor = nextCursor;
+    const resp = (await cloudinary.api.resources(opts)) as {
+      resources?: { public_id: string; created_at?: string }[];
+      next_cursor?: string;
+    };
+    const list = resp.resources ?? [];
+    for (const r of list) {
+      results.push({ public_id: r.public_id, created_at: r.created_at ?? "" });
+    }
+    nextCursor = resp.next_cursor;
+  } while (nextCursor);
+  return results;
+}
+
+/**
+ * Delete all image resources whose public_id starts with the given prefix.
+ * Use a trailing slash for a folder, e.g. "projects/20260217-143022/".
+ *
+ * @param prefix - Prefix (folder path with trailing slash) to delete
+ */
+export async function deleteResourcesByPrefix(prefix: string): Promise<void> {
+  if (!prefix || !prefix.trim()) return;
+  const trimmed = prefix.trim();
+  await cloudinary.api.delete_resources_by_prefix(trimmed, { resource_type: "image" });
+}
+
+/** Default age threshold for orphaned folder cleanup: 1 hour (ms). */
+export const ORPHANED_FOLDER_AGE_MS = 60 * 60 * 1000;
+
+/**
+ * Find project folders in Cloudinary that are not in the known set and whose
+ * oldest asset is older than the given threshold. Used to clean up abandoned uploads
+ * (e.g. user closed the page before creating the project).
+ *
+ * @param knownFolders - Set of folder paths that belong to existing projects (from DB)
+ * @param olderThanMs - Only consider folders whose oldest asset is older than this (ms ago)
+ * @returns Array of folder paths to delete
+ */
+export async function findOrphanedProjectFolders(
+  knownFolders: Set<string>,
+  olderThanMs: number = ORPHANED_FOLDER_AGE_MS,
+): Promise<string[]> {
+  const resources = await listResourcesByPrefix(`${DEFAULT_PROJECTS_FOLDER}/`);
+  const folderToOldest: Record<string, number> = {};
+  const cutoff = Date.now() - olderThanMs;
+  for (const r of resources) {
+    const idx = r.public_id.lastIndexOf("/");
+    const folder = idx > 0 ? r.public_id.slice(0, idx) : r.public_id;
+    if (!folder.startsWith(DEFAULT_PROJECTS_FOLDER + "/")) continue;
+    const created = r.created_at ? new Date(r.created_at).getTime() : 0;
+    if (folderToOldest[folder] == null || created < folderToOldest[folder]) {
+      folderToOldest[folder] = created;
+    }
+  }
+  const orphaned: string[] = [];
+  for (const [folder, oldest] of Object.entries(folderToOldest)) {
+    if (knownFolders.has(folder)) continue;
+    if (oldest > 0 && oldest < cutoff) orphaned.push(folder);
+  }
+  return orphaned;
+}
+
+/**
+ * Delete orphaned project folders from Cloudinary (contents first, then folder).
+ * Call this periodically (e.g. cron or on-demand) to remove abandoned uploads.
+ *
+ * @param knownFolders - Set of folder paths that belong to existing projects
+ * @param olderThanMs - Only delete folders whose oldest asset is older than this
+ * @returns List of folder paths that were deleted
+ */
+export async function cleanupOrphanedProjectFolders(
+  knownFolders: Set<string>,
+  olderThanMs: number = ORPHANED_FOLDER_AGE_MS,
+): Promise<string[]> {
+  const toDelete = await findOrphanedProjectFolders(knownFolders, olderThanMs);
+  const deleted: string[] = [];
+  for (const folder of toDelete) {
+    try {
+      await deleteResourcesByPrefix(`${folder}/`);
+      await deleteFolder(folder);
+      deleted.push(folder);
+    } catch (err) {
+      console.error(`Cloudinary cleanup: failed to delete folder ${folder}`, err);
+    }
+  }
+  return deleted;
+}
+
+/**
  * Replace a project's image in Cloudinary.
  * Best-effort deletes the existing image (if any) and uploads a new one.
  *
@@ -311,7 +415,7 @@ export async function replaceProjectImage(
 }
 
 /** Regex pattern matching valid CLOUDINARY_URL format */
-const CLOUDINARY_URL_REGEX = /^cloudinary:\/\/[^:]+:[^@]+@[a-zA-Z0-9_-]+$/;
+const CLOUDINARY_URL_REGEX = /^cloudinary:\/\/[^:]+:[^@]+@([a-zA-Z0-9_-]+)$/;
 
 /**
  * Ensure `CLOUDINARY_URL` is set and has a valid format before generating URLs.
@@ -328,6 +432,62 @@ function assertCloudinaryUrlConfigured(): void {
       "CLOUDINARY_URL has invalid format; expected cloudinary://API_KEY:API_SECRET@CLOUD_NAME",
     );
   }
+}
+
+/**
+ * Get Cloudinary cloud name from CLOUDINARY_URL.
+ * @internal
+ */
+function getCloudName(): string {
+  const url = process.env.CLOUDINARY_URL?.trim();
+  if (!url) throw new Error("CLOUDINARY_URL is not set");
+  const match = url.match(CLOUDINARY_URL_REGEX);
+  if (!match) throw new Error("CLOUDINARY_URL has invalid format");
+  return match[1];
+}
+
+/** Max width for hero/landing images to avoid loading full-resolution phone photos (saves memory and bandwidth). */
+const HERO_IMAGE_MAX_WIDTH = 1920;
+
+/**
+ * Build an HTTPS URL for an image by public ID.
+ * Uses f_auto so HEIC and other formats are delivered as browser-compatible (e.g. JPEG/WebP).
+ * Fixes broken images when users upload HEIC from iPhone.
+ *
+ * @param publicId - The Cloudinary public ID (e.g. "landing/xyz" or "folder/id")
+ * @returns Full HTTPS URL to the image (transformed for display)
+ */
+export function getImageUrl(publicId: string): string {
+  const cloudName = getCloudName();
+  return `https://res.cloudinary.com/${cloudName}/image/upload/f_auto/${publicId}`;
+}
+
+/**
+ * Build an HTTPS URL for the landing hero image with a max width so the browser
+ * never loads full-resolution phone photos (e.g. 12MP). Avoids high memory use and near-crash on refresh.
+ *
+ * @param publicId - The Cloudinary public ID (e.g. "landing/xyz")
+ * @returns Full HTTPS URL with w_1920,c_fill,f_auto
+ */
+export function getHeroImageUrl(publicId: string): string {
+  const cloudName = getCloudName();
+  const transformation = `w_${HERO_IMAGE_MAX_WIDTH},c_fill,f_auto`;
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${publicId}`;
+}
+
+/**
+ * Convert a Cloudinary image URL to a display URL that uses f_auto,
+ * so HEIC and other formats are delivered as browser-compatible (e.g. JPEG/WebP).
+ * Use when returning image URLs to the client (e.g. project images).
+ * Idempotent: if the URL already contains f_auto, returns it unchanged.
+ *
+ * @param url - Full Cloudinary image URL (e.g. from upload response or DB)
+ * @returns URL that will display in all browsers
+ */
+export function toDisplayUrl(url: string): string {
+  if (!url || typeof url !== "string") return url;
+  if (url.includes("/f_auto/")) return url;
+  return url.replace("/image/upload/", "/image/upload/f_auto/");
 }
 
 /**
