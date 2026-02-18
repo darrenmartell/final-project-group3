@@ -94,12 +94,19 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url);
+    const purpose = searchParams.get("purpose");
     const projectId = searchParams.get("projectId");
     const yearParam = searchParams.get("year");
     const monthParam = searchParams.get("month");
     const dayParam = searchParams.get("day");
 
     let folder: string;
+
+    if (purpose === "landing") {
+      folder = "landing";
+      const params = getSignedUploadParams(folder);
+      return NextResponse.json(params);
+    }
 
     if (projectId) {
       const project = await prisma.project.findUnique({

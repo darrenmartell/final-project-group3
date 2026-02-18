@@ -17,6 +17,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "../route";
 import { prisma } from "@/lib/db";
+import { toDisplayUrl } from "@/lib/cloudinary";
 import type { ProjectApiResponse } from "@/types/project";
 import { mockProjects } from "../../../../../tests/fixtures/projects";
 
@@ -65,8 +66,9 @@ function withProjectTags(projects: typeof mockProjects) {
 function expectedProjectList(projects: typeof mockProjects) {
     return projects.map((p) => ({
         ...p,
+        imageUrl: p.imageUrl ? toDisplayUrl(p.imageUrl) : null,
         tags: p.tags ?? [],
-        images: p.imageUrl ? [{ imageUrl: p.imageUrl }] : [],
+        images: p.imageUrl ? [{ imageUrl: toDisplayUrl(p.imageUrl) }] : [],
     }));
 }
 

@@ -78,11 +78,14 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  /** Newly added images (uploaded to Cloudinary on select). Thumbnails use displayUrl (f_auto). */
+  const [newImages, setNewImages] = useState<{ publicId: string; secureUrl: string; displayUrl: string }[]>([]);
   const [existingImages, setExistingImages] = useState<{ url: string; publicId: string }[]>([]);
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
   const [removeImage, setRemoveImage] = useState(false);
+  /** Folder used for uploads this session (create flow). Set when first batch is uploaded. */
+  const [cloudinaryFolder, setCloudinaryFolder] = useState<string | null>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +133,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
           ? [{ url: editProject.imageUrl, publicId: editProject.imagePublicId }]
           : [];
     setExistingImages(initialImages);
+    setNewImages([]);
     const thumbIdx =
       initialImages.length && editProject.imagePublicId
         ? initialImages.findIndex((i) => i.publicId === editProject.imagePublicId)
@@ -158,7 +162,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
     }
   }, [success]);
 
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
   const maxSize = 10 * 1024 * 1024; // 10MB
 
   const now = new Date();
@@ -195,13 +199,97 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
     return currentDayVal;
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
+  /** Build display URL for thumbnails (f_auto so HEIC etc. show correctly). */
+  function toDisplayUrl(secureUrl: string): string {
+    if (!secureUrl || !secureUrl.includes('/image/upload/')) return secureUrl;
+    return secureUrl.replace('/image/upload/', '/image/upload/w_400,c_fill,f_auto/');
+  }
 
+  /** Upload one file to Cloudinary via XHR (for progress). Returns { publicId, secureUrl, displayUrl }. */
+  function uploadOneFile(
+    file: File,
+    config: { cloudName: string; apiKey: string; timestamp: number; signature: string; folder: string },
+    onProgress: (loaded: number) => void,
+  ): Promise<{ publicId: string; secureUrl: string; displayUrl: string }> {
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('api_key', config.apiKey);
+    fd.append('timestamp', String(config.timestamp));
+    fd.append('signature', config.signature);
+    fd.append('folder', config.folder);
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) onProgress(e.loaded);
+      });
+      xhr.addEventListener('load', () => {
+        onProgress(file.size);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            resolve({
+              publicId: result.public_id,
+              secureUrl: result.secure_url,
+              displayUrl: toDisplayUrl(result.secure_url),
+            });
+          } catch {
+            reject(new Error('Invalid Cloudinary response'));
+          }
+        } else {
+          try {
+            const err = JSON.parse(xhr.responseText);
+            reject(new Error(err.error?.message || 'Upload failed'));
+          } catch {
+            reject(new Error('Upload failed'));
+          }
+        }
+      });
+      xhr.addEventListener('error', () => reject(new Error('Network error')));
+      xhr.open('POST', uploadUrl);
+      xhr.send(fd);
+    });
+  }
+
+  /** Get signed upload config. For create: optional year/month/day. For edit: projectId. */
+  async function getUploadConfig(): Promise<{ cloudName: string; apiKey: string; timestamp: number; signature: string; folder: string }> {
+    const configUrl = new URL('/api/cloudinary-config', window.location.origin);
+    if (editProject) {
+      configUrl.searchParams.set('projectId', editProject.id);
+    } else {
+      const hasDate =
+        projectDateYear.trim() !== '' &&
+        projectDateMonth.trim() !== '' &&
+        parseInt(projectDateYear, 10) >= 1970 &&
+        parseInt(projectDateMonth, 10) >= 1 &&
+        parseInt(projectDateMonth, 10) <= 12;
+      if (hasDate) {
+        configUrl.searchParams.set('year', projectDateYear.trim());
+        configUrl.searchParams.set('month', projectDateMonth.trim());
+        if (projectDateDay.trim() !== '') {
+          const day = parseInt(projectDateDay.trim(), 10);
+          if (day >= 1 && day <= 31) configUrl.searchParams.set('day', projectDateDay.trim());
+        }
+      }
+    }
+    const res = await fetch(configUrl.toString(), { credentials: 'include' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Upload not configured');
+    }
+    return res.json();
+  }
+
+  /**
+   * User selected files: validate, upload each to Cloudinary immediately with progress, add to newImages.
+   * If the user abandons the form (closes the page without saving), these images remain in Cloudinary
+   * until the orphaned-folder cleanup runs. See GET /api/cloudinary-cleanup and docs/cloudinary-cleanup.md.
+   */
+  async function processSelectedFiles(files: File[]) {
+    if (!files.length) return;
     for (const file of files) {
       if (!validTypes.includes(file.type)) {
-        setError('Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.');
+        setError('Invalid file type. Only JPEG, PNG, WebP, GIF, and HEIC are allowed.');
         return;
       }
       if (file.size > maxSize) {
@@ -209,56 +297,113 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
         return;
       }
     }
-
-    const newPreviews: string[] = new Array(files.length);
-    let loaded = 0;
-    files.forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        newPreviews[index] = reader.result as string;
-        loaded++;
-        if (loaded === files.length) {
-          setImagePreviews((prev) => [...prev, ...newPreviews]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    setImageFiles((prev) => [...prev, ...files]);
-    setRemoveImage(false);
     setError(null);
+    setUploadingCount((c) => c + files.length);
+    setUploadProgress(0);
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    const loadedPerFile = new Array<number>(files.length).fill(0);
+    const updateProgress = () => {
+      const loaded = loadedPerFile.reduce((a, b) => a + b, 0);
+      setUploadProgress(totalBytes ? Math.round((loaded / totalBytes) * 100) : 100);
+    };
+    try {
+      const config = await getUploadConfig();
+      if (!editProject) setCloudinaryFolder((f) => f || config.folder);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const one = await uploadOneFile(file, config, (loaded) => {
+            loadedPerFile[i] = loaded;
+            updateProgress();
+          });
+          setNewImages((prev) => [...prev, one]);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Upload failed');
+        } finally {
+          setUploadingCount((c) => Math.max(0, c - 1));
+        }
+      }
+      setUploadProgress(100);
+      setRemoveImage(false);
+      // Reset so submit progress bar starts at 0 if shown
+      setTimeout(() => setUploadProgress(0), 400);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload not configured');
+      setUploadingCount((c) => Math.max(0, c - files.length));
+      setUploadProgress(0);
+    }
+  }
 
-    const fileInput = e.target;
-    if (fileInput) fileInput.value = '';
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    const files = raw.filter((f) => validTypes.includes(f.type) || f.type.startsWith('image/'));
+    if (files.length === 0 && raw.length > 0) {
+      setError('Please choose image files (e.g. JPEG, PNG, HEIC).');
+      return;
+    }
+    void processSelectedFiles(files);
   };
 
-  const removeNewImageAt = (index: number) => {
+  /** Remove a newly added image: delete from Cloudinary and from state. */
+  async function removeNewImageAt(index: number) {
     const newIndex = existingImages.length + index;
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-    if (thumbnailIndex === newIndex) {
-      setThumbnailIndex(0);
-    } else if (thumbnailIndex > newIndex) {
-      setThumbnailIndex((prev) => prev - 1);
+    const item = newImages[index];
+    if (item) {
+      try {
+        await fetch('/api/cloudinary-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ publicId: item.publicId }),
+        });
+      } catch {
+        // best effort
+      }
+      setNewImages((prev) => prev.filter((_, i) => i !== index));
     }
-  };
+    if (thumbnailIndex === newIndex) setThumbnailIndex(0);
+    else if (thumbnailIndex > newIndex) setThumbnailIndex((prev) => prev - 1);
+  }
 
-  const removeExistingImageAt = (index: number) => {
+  /** Remove an existing project image: delete from Cloudinary and from state. */
+  async function removeExistingImageAt(index: number) {
     if (existingImages.length <= 1) return;
-    setExistingImages((prev) => prev.filter((_, i) => i !== index));
-    if (thumbnailIndex === index) {
-      setThumbnailIndex(0);
-    } else if (thumbnailIndex > index) {
-      setThumbnailIndex((prev) => prev - 1);
+    const item = existingImages[index];
+    try {
+      await fetch('/api/cloudinary-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ publicId: item.publicId }),
+      });
+    } catch {
+      // best effort
     }
-  };
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+    if (thumbnailIndex === index) setThumbnailIndex(0);
+    else if (thumbnailIndex > index) setThumbnailIndex((prev) => prev - 1);
+  }
 
-  const handleRemoveAllImages = () => {
+  const handleRemoveAllImages = async () => {
     const confirmed = window.confirm(
-      'Are you sure you want to remove all images? This cannot be undone until you save.',
+      'Are you sure you want to remove all images? They will be deleted from the server immediately.',
     );
     if (!confirmed) return;
-    setImageFiles([]);
-    setImagePreviews([]);
+    const toDelete = [...existingImages, ...newImages];
+    for (const img of toDelete) {
+      try {
+        await fetch('/api/cloudinary-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ publicId: img.publicId }),
+        });
+      } catch {
+        // best effort
+      }
+    }
+    setNewImages([]);
     setExistingImages([]);
     setThumbnailIndex(0);
     setRemoveImage(true);
@@ -273,7 +418,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
     setSuccess(false);
     setDateError(null);
 
-    const totalImages = existingImages.length + imagePreviews.length;
+    const totalImages = existingImages.length + newImages.length;
 
     // Require at least one image for create; for edit, block if removing all without adding new ones
     if (!editProject) {
@@ -298,7 +443,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
     setUploadProgress(0);
     const thumbIdx = totalImages > 0 ? Math.min(thumbnailIndex, totalImages - 1) : 0;
 
-    // Edit project: keep FormData flow (server uploads to Cloudinary)
+    // Edit project: FormData with keepPublicIds + pre-uploaded new images (no file upload on submit)
     if (editProject) {
       const formData = new FormData();
       formData.append('title', title);
@@ -310,22 +455,21 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
         formData.append('projectDateMonth', projectDateMonth.trim());
         if (projectDateDay.trim() !== '') formData.append('projectDateDay', projectDateDay.trim());
       }
-      imageFiles.forEach((file) => formData.append('image', file));
       if (removeImage) {
         formData.append('removeImage', 'true');
       } else {
         existingImages.forEach((img) => formData.append('keepPublicIds', img.publicId));
       }
+      if (newImages.length > 0) {
+        formData.append(
+          'uploadedImages',
+          JSON.stringify(newImages.map((n) => ({ secureUrl: n.secureUrl, publicId: n.publicId }))),
+        );
+      }
       formData.append('thumbnailIndex', String(thumbIdx));
 
       const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      });
       xhr.addEventListener('load', () => {
-        setUploadProgress(100);
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const project = JSON.parse(xhr.responseText);
@@ -334,11 +478,11 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
             setTitle('');
             setDescription('');
             setTags([]);
-            setImageFiles([]);
-            setImagePreviews([]);
+            setNewImages([]);
             setExistingImages([]);
             setThumbnailIndex(0);
             setRemoveImage(false);
+            setCloudinaryFolder(null);
             setProjectDateYear('');
             setProjectDateMonth('');
             setProjectDateDay('');
@@ -370,89 +514,15 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
       return;
     }
 
-    // Create project: upload images to Cloudinary from client (real progress), then POST JSON
-    if (imageFiles.length > 0) {
+    // Create project: images already in Cloudinary (newImages), POST JSON
+    if (newImages.length > 0) {
+      const hasDate =
+        projectDateYear.trim() !== '' &&
+        projectDateMonth.trim() !== '' &&
+        parseInt(projectDateYear, 10) >= 1970 &&
+        parseInt(projectDateMonth, 10) >= 1 &&
+        parseInt(projectDateMonth, 10) <= 12;
       try {
-        const configUrl = new URL('/api/cloudinary-config', window.location.origin);
-        const hasDate =
-          projectDateYear.trim() !== '' &&
-          projectDateMonth.trim() !== '' &&
-          parseInt(projectDateYear, 10) >= 1970 &&
-          parseInt(projectDateMonth, 10) >= 1 &&
-          parseInt(projectDateMonth, 10) <= 12;
-        if (hasDate) {
-          configUrl.searchParams.set('year', projectDateYear.trim());
-          configUrl.searchParams.set('month', projectDateMonth.trim());
-          if (projectDateDay.trim() !== '') {
-            const day = parseInt(projectDateDay.trim(), 10);
-            if (day >= 1 && day <= 31) configUrl.searchParams.set('day', projectDateDay.trim());
-          }
-        }
-        const configRes = await fetch(configUrl.toString(), { credentials: 'include' });
-        if (!configRes.ok) {
-          const data = await configRes.json().catch(() => ({}));
-          throw new Error(data.error || 'Upload not configured');
-        }
-        const { cloudName, apiKey, timestamp, signature, folder: cloudinaryFolder } = await configRes.json();
-        const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-
-        const totalBytes = imageFiles.reduce((sum, f) => sum + f.size, 0);
-        const loadedPerFile = new Array<number>(imageFiles.length).fill(0);
-        const updateProgress = () => {
-          const loaded = loadedPerFile.reduce((a, b) => a + b, 0);
-          setUploadProgress(totalBytes ? Math.round((loaded / totalBytes) * 100) : 100);
-        };
-
-        const uploadOne = (
-          file: File,
-          index: number,
-        ): Promise<{ secureUrl: string; publicId: string }> =>
-          new Promise((resolve, reject) => {
-            const fd = new FormData();
-            fd.append('file', file);
-            fd.append('api_key', apiKey);
-            fd.append('timestamp', String(timestamp));
-            fd.append('signature', signature);
-            fd.append('folder', cloudinaryFolder);
-            const xhr = new XMLHttpRequest();
-            xhr.upload.addEventListener('progress', (event) => {
-              if (event.lengthComputable) {
-                loadedPerFile[index] = event.loaded;
-                updateProgress();
-              }
-            });
-            xhr.addEventListener('load', () => {
-              loadedPerFile[index] = file.size;
-              updateProgress();
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  const result = JSON.parse(xhr.responseText);
-                  resolve({
-                    secureUrl: result.secure_url,
-                    publicId: result.public_id,
-                  });
-                } catch {
-                  reject(new Error('Invalid Cloudinary response'));
-                }
-              } else {
-                try {
-                  const err = JSON.parse(xhr.responseText);
-                  reject(new Error(err.error?.message || 'Upload failed'));
-                } catch {
-                  reject(new Error('Upload failed'));
-                }
-              }
-            });
-            xhr.addEventListener('error', () => reject(new Error('Network error')));
-            xhr.open('POST', uploadUrl);
-            xhr.send(fd);
-          });
-
-        const uploadedImages = await Promise.all(
-          imageFiles.map((file, i) => uploadOne(file, i)),
-        );
-        setUploadProgress(100);
-
         const projectRes = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -463,8 +533,8 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
             tags,
             featured: false,
             thumbnailIndex: thumbIdx,
-            uploadedImages,
-            cloudinaryFolder: typeof cloudinaryFolder === 'string' ? cloudinaryFolder : undefined,
+            uploadedImages: newImages.map((n) => ({ secureUrl: n.secureUrl, publicId: n.publicId })),
+            cloudinaryFolder: cloudinaryFolder ?? undefined,
             dateIsMonthOnly: hasDate && projectDateDay.trim() === '',
           }),
         });
@@ -483,15 +553,15 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
         setProjectDateYear('');
         setProjectDateMonth('');
         setProjectDateDay('');
-        setImageFiles([]);
-        setImagePreviews([]);
+        setNewImages([]);
         setExistingImages([]);
         setThumbnailIndex(0);
         setRemoveImage(false);
+        setCloudinaryFolder(null);
         const fileInput = document.getElementById('image') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Upload failed');
+        setError(err instanceof Error ? err.message : 'Failed to create project');
       } finally {
         setLoading(false);
         setUploadProgress(0);
@@ -717,7 +787,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
             Click an image to set it as the project thumbnail (shown in project cards).
           </p>
 
-          {(existingImages.length > 0 && !removeImage) || imagePreviews.length > 0 ? (
+          {(existingImages.length > 0 && !removeImage) || newImages.length > 0 ? (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-3">
                 {!removeImage &&
@@ -746,7 +816,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                       {existingImages.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => removeExistingImageAt(index)}
+                          onClick={() => void removeExistingImageAt(index)}
                           className="absolute top-2 right-2 flex items-center justify-center bg-destructive text-destructive-foreground w-8 h-8 rounded-full text-lg font-bold shadow-md hover:scale-110 transition-all z-10"
                           title="Remove this image"
                           aria-label="Remove this image"
@@ -756,10 +826,10 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                       )}
                     </div>
                   ))}
-                {imagePreviews.map((preview, index) => {
+                {newImages.map((img, index) => {
                   const idx = existingImages.length + index;
                   return (
-                    <div key={`new-${idx}`} className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-border shrink-0 group">
+                    <div key={`new-${img.publicId}`} className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-border shrink-0 group">
                       <button
                         type="button"
                         onClick={() => setThumbnailIndex(idx)}
@@ -769,7 +839,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                           thumbnailIndex === idx ? 'border-primary ring-2 ring-primary' : 'border-transparent'
                         }`}
                       />
-                      <Image src={preview} alt="" fill className="object-cover pointer-events-none" sizes="128px" />
+                      <Image src={img.displayUrl} alt="" fill className="object-cover pointer-events-none" sizes="128px" unoptimized />
                       {thumbnailIndex === idx && (
                         <span className="absolute bottom-0 left-0 right-0 bg-primary/90 text-primary-foreground text-xs font-medium py-1 text-center pointer-events-none">
                           Thumbnail
@@ -777,7 +847,7 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                       )}
                       <button
                         type="button"
-                        onClick={() => removeNewImageAt(index)}
+                        onClick={() => void removeNewImageAt(index)}
                         className="absolute top-2 right-2 flex items-center justify-center bg-destructive text-destructive-foreground w-8 h-8 rounded-full text-lg font-bold shadow-md hover:scale-110 transition-all z-10"
                         title="Remove this image"
                         aria-label="Remove this image"
@@ -788,21 +858,23 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                   );
                 })}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <input
                   type="file"
                   id="image"
                   onChange={handleImageChange}
-                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                   multiple
                   className="hidden"
+                  aria-label="Choose project images"
                 />
-                <label
-                  htmlFor="image"
-                  className="cursor-pointer inline-block px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors border border-border"
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('image')?.click()}
+                  disabled={uploadingCount > 0}
+                  className="cursor-pointer inline-block px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors border border-border disabled:opacity-50"
                 >
-                  Add more images
-                </label>
+                  {uploadingCount > 0 ? 'Uploading…' : 'Add more images'}
+                </button>
                 <button
                   type="button"
                   onClick={handleRemoveAllImages}
@@ -818,18 +890,20 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
                 type="file"
                 id="image"
                 onChange={handleImageChange}
-                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                 multiple
                 className="hidden"
+                aria-label="Choose project images"
               />
-              <label
-                htmlFor="image"
-                className="cursor-pointer inline-block px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-accent transition-colors shadow"
+              <button
+                type="button"
+                onClick={() => document.getElementById('image')?.click()}
+                disabled={uploadingCount > 0}
+                className="cursor-pointer inline-block px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-accent transition-colors shadow disabled:opacity-50"
               >
-                Click to upload images
-              </label>
+                {uploadingCount > 0 ? 'Uploading…' : 'Choose images'}
+              </button>
               <p className="text-xs text-muted-foreground mt-2">
-                JPEG, PNG, WebP, or GIF (max 10MB each). You can select multiple files.
+                JPEG, PNG, WebP, GIF, or HEIC (max 10MB each). You can select multiple files.
               </p>
             </div>
           )}
@@ -837,22 +911,24 @@ export default function ProjectUploadForm({ onSuccess, editProject }: ProjectUpl
 
         {/* Submit Button / Upload progress */}
         <div className="space-y-2">
-          {loading ? (
+          {loading || uploadingCount > 0 ? (
             <div className="relative w-full h-12 rounded-lg overflow-hidden bg-muted border border-border flex items-center justify-center">
               <div
                 className="absolute inset-y-0 left-0 bg-primary text-primary-foreground transition-[width] duration-300 ease-out"
                 style={{ width: `${uploadProgress}%` }}
               />
               <span className="relative z-10 font-medium text-foreground">
-                {uploadProgress > 0 && uploadProgress < 100
-                  ? `${editProject ? 'Updating' : 'Uploading'}... ${uploadProgress}%`
-                  : editProject ? 'Updating...' : 'Uploading...'}
+                {uploadingCount > 0
+                  ? `Uploading images... ${uploadProgress}%`
+                  : uploadProgress > 0 && uploadProgress < 100
+                    ? `${editProject ? 'Updating' : 'Uploading'}... ${uploadProgress}%`
+                    : editProject ? 'Updating...' : 'Uploading...'}
               </span>
             </div>
           ) : (
             <button
               type="submit"
-              disabled={!title || (existingImages.length + imagePreviews.length === 0)}
+              disabled={!title || (existingImages.length + newImages.length === 0) || uploadingCount > 0}
               className="w-full py-3 px-6 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow"
             >
               {editProject ? 'Update Project' : 'Create Project'}

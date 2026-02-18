@@ -11,6 +11,7 @@ import {
   deleteImage,
   generateProjectFolder,
   parseFolderToCreatedAt,
+  toDisplayUrl,
 } from "@/lib/cloudinary";
 import { resolveTagNamesToIds } from "@/lib/tags";
 
@@ -123,9 +124,10 @@ export async function GET(req: Request) {
 
     const serialized = projects.map((p) => ({
       ...p,
+      imageUrl: p.imageUrl ? toDisplayUrl(p.imageUrl) : null,
       tags: p.projectTags.map((pt) => pt.tag.name),
       projectTags: undefined,
-      images: p.images.map((img) => ({ imageUrl: img.imageUrl })),
+      images: p.images.map((img) => ({ imageUrl: toDisplayUrl(img.imageUrl) })),
     }));
 
     if (limit != null) {
